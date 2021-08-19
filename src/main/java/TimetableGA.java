@@ -10,8 +10,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.ArrayList;
 import java.util.Collections;
 
-import java.util.Arrays;
-
 public class TimetableGA {
     // parameters for this project
     private static final int GRADE_CNT = 3;
@@ -28,6 +26,7 @@ public class TimetableGA {
     public static void main(String[] args) throws IOException,
             CsvValidationException {
 
+        System.out.println("Running...");
         // 記錄程式開始執行的時間
         long startTime = System.nanoTime();
 
@@ -185,7 +184,6 @@ public class TimetableGA {
         }
 
         // 建立初始解
-        // TODO: 如何建置重排結構?
         for (int populationIndex = 0; populationIndex < (POPULATION_SIZE + 1); populationIndex++) {
 
             int[][][] temp_teacherActualTimetable;
@@ -201,7 +199,7 @@ public class TimetableGA {
 
                 boolean arrangeAllClassAgain = false;
 
-                System.out.println("(Re)start arranging all classes");
+//                System.out.println("(Re)start arranging all classes");
 
                 // 初始化重排課用的陣列
                 temp_teacherActualTimetable = new int[TEACHER_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
@@ -262,8 +260,8 @@ public class TimetableGA {
                     randomNumberList.clear();
 
                     if (arrangeAllClassAgain) {
-                        System.out.print("\tUnknown Error: ");
-                        System.out.println("Jump to REARRANGE_ALL_CLASS when arrange class " + classIndex + "'s teacher for school meeting");
+//                        System.out.print("\tUnknown Error: ");
+//                        System.out.println("Jump to REARRANGE_ALL_CLASS when arrange class " + classIndex + "'s teacher for school meeting");
                         break;
                     }
 
@@ -301,8 +299,8 @@ public class TimetableGA {
                     randomNumberList.clear();
 
                     if (arrangeAllClassAgain) {
-                        System.out.print("\tUnknown Error: ");
-                        System.out.println("Jump to REARRANGE_ALL_CLASS when arrange class " + classIndex + "'s teacher for club course");
+//                        System.out.print("\tUnknown Error: ");
+//                        System.out.println("Jump to REARRANGE_ALL_CLASS when arrange class " + classIndex + "'s teacher for club course");
                         break;
                     }
 
@@ -322,7 +320,7 @@ public class TimetableGA {
                     // 選班級上體育課的時間
                     int peDay = 0;
                     int pePeriod = 0;
-                    boolean noEmptyRoom, isImpossiblePeriod, isClassMeetingTime, isSchoolMeetingTime;
+                    boolean noEmptyRoom, isImpossiblePeriod, notValidTimeForClass;
                     do {
                         // 如果體育課時間一直選不出來，重頭開始排課
                         if (peClassFailureCnt > 1000000) {
@@ -334,26 +332,28 @@ public class TimetableGA {
                         if (peDay != 0 && pePeriod != 0) {
                             peClassFailureCnt++;
                         }
-                        isImpossiblePeriod = (peDay == 4) || (pePeriod == PERIOD_CNT);
+                        isImpossiblePeriod = (pePeriod == 4) || (pePeriod == PERIOD_CNT);
                         if (isImpossiblePeriod) {
                             noEmptyRoom = true;
+                            notValidTimeForClass = true;
                         }
                         else {
                             noEmptyRoom = (temp_subjectRoomCnt[peId][peDay][pePeriod] >= subjectRoomLimit[peId]) ||
                                     (temp_subjectRoomCnt[peId][peDay][pePeriod + 1] >= subjectRoomLimit[peId]);
+                            // 體育課不能和班會、周會、聯課衝堂
+                            notValidTimeForClass = (temp_classSubjectTable[classIndex][peDay][pePeriod] != 0) ||
+                                    (temp_classSubjectTable[classIndex][peDay][pePeriod + 1] != 0);
                         }
-                        isClassMeetingTime = (peDay == classMeetingDay) && (pePeriod == classMeetingPeriod);
-                        isSchoolMeetingTime = (peDay == schoolMeetingDay) && (pePeriod == schoolMeetingPeriod);
-                    } while(isImpossiblePeriod || noEmptyRoom ||  isClassMeetingTime || isSchoolMeetingTime);
+                    } while (isImpossiblePeriod || noEmptyRoom ||  notValidTimeForClass);
 
                     if (arrangeAllClassAgain) {
-                        System.out.println("\tJump to REARRANGE_ALL_CLASS when arrange class " + classIndex + "'s time for PE class");
+//                        System.out.println("\tJump to REARRANGE_ALL_CLASS when arrange class " + classIndex + "'s time for PE class");
                         break;
                     }
 
                     // 選體育老師
                     int peTeacherId = 0;
-                    boolean notValidTeacher;
+                    boolean notValidTeacher, notValidTimeForTeacher;
                     for (int i = 1; i <= TEACHER_CNT; i++) {
                         randomNumberList.add(i);
                     }
@@ -367,13 +367,14 @@ public class TimetableGA {
                         }
                         peTeacherId = randomNumberList.get(listIndex);
                         listIndex++;
-                        notValidTeacher = (temp_teacherActualTimetable[peTeacherId][peDay][pePeriod] == 1) ||
+                        notValidTeacher = teacherTeaching[peTeacherId][peId] == 0;
+                        notValidTimeForTeacher = (temp_teacherActualTimetable[peTeacherId][peDay][pePeriod] == 1) ||
                                 (temp_teacherActualTimetable[peTeacherId][peDay][pePeriod + 1] == 1);
-                    } while (notValidTeacher);
+                    } while (notValidTeacher || notValidTimeForTeacher);
                     randomNumberList.clear();
 
                     if (arrangeAllClassAgain) {
-                        System.out.println("\tJump to REARRANGE_ALL_CLASS when arrange class " + classIndex + "'s teacher for PE class");
+//                        System.out.println("\tJump to REARRANGE_ALL_CLASS when arrange class " + classIndex + "'s teacher for PE class");
                         break;
                     }
 
@@ -444,16 +445,26 @@ public class TimetableGA {
                         }
 
                         boolean arrangeSingleClassAgain = false;
-                        System.out.println("(Re)start arranging a single class: " + classIndex);
+//                        System.out.println("(Re)start arranging a single class: " + classIndex);
 
                         // 略過 subjectIndex == 0
                         for (int subjectIndex = 1; subjectIndex < (SUBJECT_CNT + 1); subjectIndex++) {
+
+                            // 略過班會、周會、體育課
+                            int classMeetingId = 22;
+                            int schoolMeetingId = 20;
+                            int clubCourseId = 21;
+                            int peId = 13;
+                            if (subjectIndex == classMeetingId || subjectIndex == schoolMeetingId ||
+                                    subjectIndex == clubCourseId || subjectIndex == peId) {
+                                continue ;
+                            }
 
                             while (single_classSubjectCnt[classIndex][subjectIndex] < subjectFixedCnt[gradeOfClass[classIndex]][subjectIndex]) {
 
                                 // 重排條件 1
                                 if (totalFailCnt > 10000) {
-                                    System.out.println("\tJump to REARRANGE_ALL_CLASS when populationIndex: " + populationIndex +  "\t classIndex: " + classIndex);
+//                                    System.out.println("\tJump to REARRANGE_ALL_CLASS when populationIndex: " + populationIndex +  "\t classIndex: " + classIndex);
                                     arrangeAllClassAgain = true;
                                     totalFailCnt = 0;
                                     break;
@@ -480,11 +491,12 @@ public class TimetableGA {
                                     else {
                                         teacherId = single_classAssignedTeacher[classIndex][subjectIndex];
                                     }
-                                } while((teacherTeaching[teacherId][subjectIndex] == 0));
+                                } while(teacherTeaching[teacherId][subjectIndex] == 0);
                                 randomNumberList.clear();
                                 if (arrangeAllClassAgain) {
-                                    System.out.print("\tUnknown Error: ");
-                                    System.out.println("Jump to REARRANGE_ALL_CLASS when arrange class " + classIndex + "'s teacher for subject " + subjectIndex);
+//                                    System.out.print("\tUnknown Error: ");
+//                                    System.out.println("Jump to REARRANGE_ALL_CLASS when arrange class " + classIndex + "'s teacher for subject " + subjectIndex);
+                                    break;
                                 }
 
                                 // 選單堂課程的時間 (要班級 & 老師皆可以的時間)
@@ -512,7 +524,7 @@ public class TimetableGA {
 
                                 } while (noEmptyRoom || invalidForClass || invalidForTeacher);
                                 if (arrangeSingleClassAgain) {
-                                    System.out.println("\tJump to REARRANGE_SINGLE_CLASS when arrange class " + classIndex + "'s time for subject " +  subjectIndex);
+//                                    System.out.println("\tJump to REARRANGE_SINGLE_CLASS when arrange class " + classIndex + "'s time for subject " +  subjectIndex);
                                     break;
                                 }
 
@@ -590,59 +602,83 @@ public class TimetableGA {
                 isArrangingAllClass = false;
 
                 // 確認每個班級皆排課完畢才複製到真正後續 GA 會使用的陣列
-                teacherActualTimetable[populationIndex] = Arrays.copyOf(temp_teacherActualTimetable, temp_teacherActualTimetable.length);
-                classSubjectCnt[populationIndex] = Arrays.copyOf(temp_classSubjectCnt, temp_classSubjectCnt.length);
-                subjectRoomCnt[populationIndex] = Arrays.copyOf(temp_subjectRoomCnt, temp_subjectRoomCnt.length);
-                classSubjectTable[populationIndex] = Arrays.copyOf(temp_classSubjectTable, temp_classSubjectTable.length);
-                classTeacherTable[populationIndex] = Arrays.copyOf(temp_classTeacherTable, temp_classTeacherTable.length);
-                classAssignedTeacher[populationIndex] = Arrays.copyOf(temp_classAssignedTeacher, temp_classAssignedTeacher.length);
-
-            }
-        }
-
-        // 輸出班級課表
-        // 記錄科目的中文名稱 (subjectChineseName.csv)
-        String[] subjectChineseName = new String[SUBJECT_CNT + 1];
-        try (var fr = new FileReader("src/main/resources/subjectChineseName.csv", StandardCharsets.UTF_8);
-             var reader = new CSVReader(fr)) {
-            int stringIndex = 0;
-            String[] nextLine;
-            while ((nextLine = reader.readNext()) != null) {
-                for (int i = 1; i < subjectChineseName.length; i++) {
-                    subjectChineseName[i] = nextLine[stringIndex];
-                    stringIndex++;
-                }
-            }
-        }
-
-        for (int popIdx = 0; popIdx < POPULATION_SIZE; popIdx++) {
-            // 跳過 classIdx == 0
-            for (int classIdx = 1; classIdx < CLASS_CNT + 1; classIdx++) {
-                System.out.println("Class " + classIdx + " :");
-                // 橫著輸出課表
-                for (int period = 1; period < PERIOD_CNT + 1; period++) {
-                    for (int day = 1; day < DAY_CNT + 1; day++) {
-                        // 科目 : 授課老師
-                        int subjectIndex = classSubjectTable[popIdx][classIdx][day][period];
-                        String name = subjectChineseName[subjectIndex];
-                        if (name == null) {
-                            System.out.print("null + ");
-                            System.out.print(classSubjectTable[popIdx][classIdx][day][period] + ":");
-                        }
-                        else {
-                            System.out.print(name + " : ");
-                        }
-                        System.out.print(classTeacherTable[popIdx][classIdx][day][period] + "\t\t\t\t\t\t");
-                        if (day == DAY_CNT) {
-                            System.out.println();
+                for (int t = 0; t < (TEACHER_CNT + 1); t++) {
+                    for (int d = 0; d < (DAY_CNT + 1); d++) {
+                        for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                            teacherActualTimetable[populationIndex][t][d][p] = temp_teacherActualTimetable[t][d][p];
                         }
                     }
-                    if (period == PERIOD_CNT) {
-                        System.out.println();
+                }
+                for (int c = 0; c < (CLASS_CNT + 1); c++) {
+                    for (int s = 0; s < (SUBJECT_CNT + 1); s++) {
+                        classSubjectCnt[populationIndex][c][s] = temp_classSubjectCnt[c][s];
+                        classAssignedTeacher[populationIndex][c][s] = temp_classAssignedTeacher[c][s];
+                    }
+                }
+                for (int s = 0; s < (SUBJECT_CNT + 1); s++) {
+                    for (int d = 0; d < (DAY_CNT + 1); d++) {
+                        for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                            subjectRoomCnt[populationIndex][s][d][p] = temp_subjectRoomCnt[s][d][p];
+                        }
+                    }
+                }
+                for (int c = 0; c < (CLASS_CNT + 1); c++) {
+                    for (int d = 0; d < (DAY_CNT + 1); d++) {
+                        for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                            classSubjectTable[populationIndex][c][d][p] = temp_classSubjectTable[c][d][p];
+                            classTeacherTable[populationIndex][c][d][p] = temp_classTeacherTable[c][d][p];
+                        }
                     }
                 }
             }
         }
+
+//        // 輸出班級課表
+//        // 記錄科目的中文名稱 (subjectChineseName.csv)
+//        String[] subjectChineseName = new String[SUBJECT_CNT + 1];
+//        try (var fr = new FileReader("src/main/resources/subjectChineseName.csv", StandardCharsets.UTF_8);
+//             var reader = new CSVReader(fr)) {
+//            int stringIndex = 0;
+//            String[] nextLine;
+//            while ((nextLine = reader.readNext()) != null) {
+//                for (int i = 1; i < subjectChineseName.length; i++) {
+//                    subjectChineseName[i] = nextLine[stringIndex];
+//                    stringIndex++;
+//                }
+//            }
+//        }
+//
+//        for (int popIdx = 0; popIdx < POPULATION_SIZE; popIdx++) {
+//            System.out.println();
+//            System.out.println("░░░░░ Output Population " + popIdx + "'s data ░░░░░");
+//            // 跳過 classIdx == 0
+//            for (int classIdx = 1; classIdx < CLASS_CNT + 1; classIdx++) {
+//
+//                System.out.println("Population " + popIdx + " / Class " + classIdx + " :");
+//                // 橫著輸出課表
+//                for (int period = 1; period < PERIOD_CNT + 1; period++) {
+//                    for (int day = 1; day < DAY_CNT + 1; day++) {
+//                        // 科目 : 授課老師
+//                        int subjectIndex = classSubjectTable[popIdx][classIdx][day][period];
+//                        String name = subjectChineseName[subjectIndex];
+//                        if (name == null) {
+//                            System.out.print("null + ");
+//                            System.out.print(classSubjectTable[popIdx][classIdx][day][period] + ":");
+//                        }
+//                        else {
+//                            System.out.print(name + " : ");
+//                        }
+//                        System.out.print(classTeacherTable[popIdx][classIdx][day][period] + "\t\t\t\t\t\t");
+//                        if (day == DAY_CNT) {
+//                            System.out.println();
+//                        }
+//                    }
+//                    if (period == PERIOD_CNT) {
+//                        System.out.println();
+//                    }
+//                }
+//            }
+//        }
 
         // 記錄程式執行完畢的時間
         long endTime = System.nanoTime();
