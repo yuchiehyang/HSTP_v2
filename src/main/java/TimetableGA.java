@@ -20,6 +20,7 @@ public class TimetableGA {
     private static final int PERIOD_CNT = 7;
     // parameter for setting GA algorithm
     private static final int POPULATION_SIZE = 1;
+    private static final int MAX_GENERATIONS = 10;
 
 
     // IMPORTANT NOTE: 程式陣列長度皆為實際需要長度再加 1
@@ -648,7 +649,7 @@ public class TimetableGA {
 //            }
 //        }
 //
-//        for (int popIdx = 0; popIdx < POPULATION_SIZE; popIdx++) {
+//        for (int popIdx = 0; popIdx < (POPULATION_SIZE + 1); popIdx++) {
 //            System.out.println();
 //            System.out.println("░░░░░ Output Population " + popIdx + "'s data ░░░░░");
 //            // 跳過 classIdx == 0
@@ -679,6 +680,88 @@ public class TimetableGA {
 //                }
 //            }
 //        }
+
+        // 計算以軟限制式計算適應度
+        double[] objectVal = new double[POPULATION_SIZE + 1];
+        double[] fitness = new double[POPULATION_SIZE + 1];
+        // SC1: 減少教師的空堂時間 (15)
+        double[][][][] J = new double[POPULATION_SIZE + 1][TEACHER_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+        double[] fitnessJ = new double[POPULATION_SIZE + 1];
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                for (int day = 1; day < (DAY_CNT + 1); day++) {
+                    for (int period = 2; period < 7; period++) {
+                        J[popIndex][tid][day][period] = (double) teacherActualTimetable[popIndex][tid][day][period - 1]
+                                - (double) teacherActualTimetable[popIndex][tid][day][period]
+                                + (double) teacherActualTimetable[popIndex][tid][day][period + 1] - 1;
+                        // SC1: 減少教師的空堂時間 (16)
+                        if (J[popIndex][tid][day][period] < 0) {
+                            J[popIndex][tid][day][period] = 0;
+                        }
+                        fitnessJ[popIndex] += J[popIndex][tid][day][period];
+                    }
+                }
+            }
+        }
+
+        // SC2: 降低教師每周的工作日 (17)
+        double[][][] Y = new double[POPULATION_SIZE + 1][TEACHER_CNT + 1][DAY_CNT + 1];
+        double[][] D = new double[POPULATION_SIZE + 1][TEACHER_CNT + 1];
+        double[] fitnessY = new double[POPULATION_SIZE + 1];
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                for (int day = 1; day < (DAY_CNT + 1); day++) {
+                    for (int period = 1; period < (PERIOD_CNT + 1); period++) {
+                        if (teacherActualTimetable[popIndex][tid][day][period] != 0) {
+                            Y[popIndex][tid][day] = 1;
+                            break;
+                        }
+                    }
+                    D[popIndex][tid] += Y[popIndex][tid][day];
+                }
+                fitnessY[popIndex] += D[popIndex][tid];
+            }
+        }
+
+        // TODO: 整理老師每周最低上課時數的數據，可用 csv 檔匯入
+        // TODO: SC3: 平衡教師不需要工作的天數 (19)
+        // TODO: SC3: 平衡教師不需要工作的天數 (20)
+        // TODO: SC4: 降低教師每周的實際工作節次數 (22)
+        // TODO: SC4: 降低教師每周的實際工作節次數 (23)
+        // TODO: SC5: 降低教師於上午四節的連續排課數量 - owner: chloe
+        // TODO: SC6: 降低教師下午三節的連續排課數量 - owner: chloe
+        // TODO: SC7: 降低教師午休時間前後的連續排課數量 - owner: chloe
+
+        // 加總上面的分數
+        double totalFitness = 0.0;
+        // 各參數比重先寫死，之後可再優化
+        // TODO: 還需要 alpha3 - alpha7
+        double alpha1 = 1;
+        double alpha2 = 1;
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            // TODO: 等 SC3 - SC4 完成後要修改此處
+            objectVal[popIndex] = alpha1 * fitnessJ[popIndex] + alpha2 * fitnessY[popIndex];
+            // 適應值為目標值的倒數
+            fitness[popIndex] = 1.0 / objectVal[popIndex];
+            totalFitness += fitness[popIndex];
+        }
+
+        // 開始執行 GA 疊代
+        int generation = 0;
+        while (generation < MAX_GENERATIONS) {
+            // do something
+        }
+
+        // 記錄最佳的適應值 & 目標值
+        double bestFitnessVal = 0.0;
+        int bestPopIndex = 0;
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            if (fitness[popIndex] > bestFitnessVal) {
+                bestFitnessVal = fitness[popIndex];
+                bestPopIndex = popIndex;
+            }
+        }
+        double bestObjVal = 1 / bestFitnessVal;
 
         // 記錄程式執行完畢的時間
         long endTime = System.nanoTime();
