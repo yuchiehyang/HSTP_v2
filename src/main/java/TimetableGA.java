@@ -455,7 +455,7 @@ public class TimetableGA {
                         // 略過 subjectIndex == 0
                         for (int subjectIndex = 1; subjectIndex < (SUBJECT_CNT + 1); subjectIndex++) {
 
-                            // 略過班會、周會、體育課
+                            // 略過班會、周會、聯課、體育課
                             int classMeetingId = 22;
                             int schoolMeetingId = 20;
                             int clubCourseId = 21;
@@ -805,7 +805,9 @@ public class TimetableGA {
                 children_classTeacherTable[popIndex] = Arrays.copyOf(classTeacherTable[popIndex], classTeacherTable[popIndex].length);
                 children_classAssignedTeacher[popIndex] = Arrays.copyOf(classAssignedTeacher[popIndex], classAssignedTeacher[popIndex].length);
             }
-            for (int popIndex = ELITISM_COUNT; popIndex < (fitness.length - ELITISM_COUNT); popIndex++) {
+
+            int pidx = ELITISM_COUNT;
+            while (pidx < (fitness.length - ELITISM_COUNT)) {
                 // 以輪盤法選擇交配使用的 2 個父代的 population
                 double[] cumulative_sum = new double[POPULATION_SIZE + 1];
                 double[] cumulative_prec = new double[POPULATION_SIZE + 1];
@@ -819,7 +821,7 @@ public class TimetableGA {
                     cumulative_prec[i] = cumulative_sum[i] / totalFitness * 100;
                 }
 
-                int parentIndex1, parentIndex2;
+                int parentIndex1 = 0, parentIndex2 = 0;
                 Random r = new Random();
                 // range: 1 - 100
                 int randomInt1 = r.nextInt(100) + 1;
@@ -836,9 +838,56 @@ public class TimetableGA {
                 }
 
                 // TODO: 2 個父代的 population 交配
+                // 選擇一個要拿來交配的班級
+                int selectClassId = r.nextInt(CLASS_CNT) + 1;
+                // 先複製其他不用交配的子代
+                // 老師可以的時間以 parentIndex1 為主
+                // 先複製要交配以外的班級，複製 parentIndex1 的課程、任課老師、教室
+                for (int cidx = 1; cidx < (CLASS_CNT + 1); cidx++) {
+                    if (cidx == selectClassId) {
+                        continue;
+                    }
+                    for (int s = 1; s < (SUBJECT_CNT + 1); s++) {
+                        children_classSubjectCnt[pidx][cidx][s] = classSubjectCnt[parentIndex1][cidx][s];
+                        children_classAssignedTeacher[pidx][cidx][s] = classAssignedTeacher[parentIndex1][cidx][s];
+                    }
+                }
+                for (int cidx = 1; cidx < CLASS_CNT + 1; cidx++) {
+                    if (cidx == selectClassId) {
+                        continue;
+                    }
+                    for (int d = 1; d < (DAY_CNT + 1); d++) {
+                        for (int p = 1; p < (PERIOD_CNT + 1); p++) {
+                            children_subjectRoomCnt[pidx][cidx][p][d] = subjectRoomCnt[parentIndex1][cidx][p][d];
+                            children_classSubjectTable[pidx][cidx][p][d] = classSubjectTable[parentIndex1][cidx][p][d];
+                            children_classTeacherTable[pidx][cidx][p][d] = classTeacherTable[parentIndex1][cidx][p][d];
+                        }
+                    }
+                }
+                // 開始處理被選中要交配的班級
+                // 固定課程 & 體育課照 parentIndex1
+                // 其他每一個課程都檢查要不要交配
+                // 如果已經填滿就跳過
+                // 再把還沒填的科目依序補滿 (用上面的方法)
+                // 如果發現填不滿，就重新跑跑看
+                int selectedClassFailureCnt = 0;
+                boolean isArrangingSelectedClass = true;
+                REARRANGE_SELECTED_CLASS:
+                while (isArrangingSelectedClass) {
+                    // 班會、周會、聯課、體育課
+                    int classMeetingId = 22;
+                    int schoolMeetingId = 20;
+                    int clubCourseId = 21;
+                    int peId = 13;
+
+
+                }
+
+
 
                 // TODO: 交配完的子代進行突變
 
+                pidx++;
             }
 
         }
