@@ -858,9 +858,12 @@ public class TimetableGA {
                     }
                     for (int d = 1; d < (DAY_CNT + 1); d++) {
                         for (int p = 1; p < (PERIOD_CNT + 1); p++) {
-                            children_subjectRoomCnt[pidx][cidx][p][d] = subjectRoomCnt[parentIndex1][cidx][p][d];
-                            children_classSubjectTable[pidx][cidx][p][d] = classSubjectTable[parentIndex1][cidx][p][d];
-                            children_classTeacherTable[pidx][cidx][p][d] = classTeacherTable[parentIndex1][cidx][p][d];
+                            children_classSubjectTable[pidx][cidx][d][p] = classSubjectTable[parentIndex1][cidx][p][d];
+                            children_classTeacherTable[pidx][cidx][d][p] = classTeacherTable[parentIndex1][cidx][p][d];
+                            int sidx = classSubjectTable[parentIndex1][cidx][d][p];
+                            children_subjectRoomCnt[pidx][sidx][d][p]++;
+                            int tidx = classTeacherTable[parentIndex1][cidx][d][p];
+                            children_teacherActualTimetable[pidx][tidx][d][p]++;
                         }
                     }
                 }
@@ -870,17 +873,82 @@ public class TimetableGA {
                 // 如果已經填滿就跳過
                 // 再把還沒填的科目依序補滿 (用上面的方法)
                 // 如果發現填不滿，就重新跑跑看
+
                 int selectedClassFailureCnt = 0;
                 boolean isArrangingSelectedClass = true;
                 REARRANGE_SELECTED_CLASS:
                 while (isArrangingSelectedClass) {
                     // 班會、周會、聯課、體育課
                     int classMeetingId = 22;
+                    int classMeetingDay = 1;
+                    int classMeetingPeriod = 1;
                     int schoolMeetingId = 20;
+                    int schoolMeetingDay = 2;
+                    int schoolMeetingPeriod = 3;
                     int clubCourseId = 21;
+                    int clubCourseDay = 2;
+                    int clubCoursePeriod = 4;
                     int peId = 13;
-
-
+                    int peDay = 0;
+                    int pePeriod = 0;
+                    for (int subjectIndex = 1; subjectIndex < (SUBJECT_CNT + 1); subjectIndex++) {
+                        if (subjectIndex == classMeetingId) {
+                            children_classSubjectTable[pidx][selectClassId][classMeetingDay][classMeetingPeriod] = classMeetingId;
+                            children_classSubjectCnt[pidx][selectClassId][classMeetingId]++;
+                            int tid = classAssignedTeacher[parentIndex1][selectClassId][classMeetingId];
+                            children_classAssignedTeacher[pidx][selectClassId][classMeetingId] = tid;
+                            children_classTeacherTable[pidx][selectClassId][classMeetingDay][classMeetingPeriod] = tid;
+                            children_teacherActualTimetable[pidx][tid][classMeetingDay][classMeetingPeriod]++;
+                            children_subjectRoomCnt[pidx][classMeetingId][classMeetingDay][classMeetingPeriod]++;
+                        }
+                        else if (subjectIndex == schoolMeetingId) {
+                            children_classSubjectTable[pidx][selectClassId][schoolMeetingDay][schoolMeetingPeriod] = schoolMeetingId;
+                            children_classSubjectCnt[pidx][selectClassId][schoolMeetingId]++;
+                            int tid = classAssignedTeacher[parentIndex1][selectClassId][schoolMeetingId];
+                            children_classAssignedTeacher[pidx][selectClassId][schoolMeetingId] = tid;
+                            children_classTeacherTable[pidx][selectClassId][schoolMeetingDay][schoolMeetingPeriod] = tid;
+                            children_teacherActualTimetable[pidx][tid][schoolMeetingDay][schoolMeetingPeriod]++;
+                            children_subjectRoomCnt[pidx][schoolMeetingId][schoolMeetingDay][schoolMeetingPeriod]++;
+                        }
+                        else if (subjectIndex == clubCourseId) {
+                            children_classSubjectTable[pidx][selectClassId][clubCourseDay][clubCoursePeriod] = clubCourseId;
+                            children_classSubjectCnt[pidx][selectClassId][clubCourseId]++;
+                            int tid = classAssignedTeacher[parentIndex1][selectClassId][clubCourseId];
+                            children_classAssignedTeacher[pidx][selectClassId][clubCourseId] = tid;
+                            children_classTeacherTable[pidx][selectClassId][clubCourseDay][clubCoursePeriod] = tid;
+                            children_teacherActualTimetable[pidx][tid][clubCourseDay][clubCoursePeriod]++;
+                            children_subjectRoomCnt[pidx][clubCourseId][clubCourseDay][clubCoursePeriod]++;
+                        }
+                        else if (subjectIndex == peId) {
+                            // 找 parentIndex1 第一節體育課的時間
+                            for (int d = 1; d < (DAY_CNT + 1); d++) {
+                                for (int p = 1; p < (PERIOD_CNT + 1); p++) {
+                                    if (classSubjectTable[parentIndex1][selectClassId][d][p] == peId) {
+                                        if (classSubjectTable[parentIndex1][selectClassId][d][p + 1] == peId) {
+                                            peDay = d;
+                                            pePeriod = p;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            children_classSubjectTable[pidx][selectClassId][peDay][pePeriod] = peId;
+                            children_classSubjectTable[pidx][selectClassId][peDay][pePeriod + 1] = peId;
+                            children_classSubjectCnt[pidx][selectClassId][clubCourseId] += 2;
+                            int tid = classAssignedTeacher[parentIndex1][selectClassId][peId];
+                            children_classAssignedTeacher[pidx][selectClassId][peId] = tid;
+                            children_classTeacherTable[pidx][selectClassId][peDay][pePeriod] = tid;
+                            children_classTeacherTable[pidx][selectClassId][peDay][pePeriod + 1] = tid;
+                            children_teacherActualTimetable[pidx][tid][peDay][pePeriod]++;
+                            children_teacherActualTimetable[pidx][tid][peDay][pePeriod + 1]++;
+                            children_subjectRoomCnt[pidx][peId][peDay][pePeriod]++;
+                            children_subjectRoomCnt[pidx][peId][peDay][pePeriod + 1]++;
+                        }
+                        // TODO: 安排班會、周會、聯課、體育課以外的單堂課程
+                        else {
+                            // Q: 要不要建立 temp 暫存還沒安排好的班級課表？
+                        }
+                    }
                 }
 
 
