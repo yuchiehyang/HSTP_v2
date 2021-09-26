@@ -21,17 +21,17 @@ public class TimetableGA {
     private static final int DAY_CNT = 5;
     private static final int PERIOD_CNT = 7;
     // parameter for setting GA algorithm
-    private static final int POPULATION_SIZE = 30;
+    private static final int POPULATION_SIZE = 6;
     private static final double MUTATION_RATE = 0.5;
     private static final double CROSSOVER_RATE = 0.5;
-    private static final int ELITISM_COUNT = 5;
-    private static final int MAX_GENERATIONS = 10;
+    private static final int ELITISM_COUNT = 1;
+    private static final int MAX_GENERATIONS = 1;
 
     // IMPORTANT NOTE: 程式陣列長度皆為實際需要長度再加 1
     public static void main(String[] args) throws IOException,
             CsvValidationException {
 
-        System.out.println("Running...");
+        System.out.println("Running initialization...");
         // 記錄程式開始執行的時間
         long startTime = System.nanoTime();
 
@@ -92,8 +92,8 @@ public class TimetableGA {
             while ((nextLine = reader.readNext()) != null) {
                 // index 0 不使用
                 for (int i = 1; i < teacherTeaching[teacherIndex].length; i++) {
-                        teacherTeaching[teacherIndex][i] = Integer.parseInt(nextLine[stringIndex]);
-                        stringIndex++;
+                    teacherTeaching[teacherIndex][i] = Integer.parseInt(nextLine[stringIndex]);
+                    stringIndex++;
                 }
                 teacherIndex++;
                 stringIndex = 0;
@@ -685,6 +685,9 @@ public class TimetableGA {
 //            }
 //        }
 
+        System.out.println("Running calculation for fitness...");
+
+
         // 計算以軟限制式計算適應度
         double[] objectVal = new double[POPULATION_SIZE + 1];
         double[] fitness = new double[POPULATION_SIZE + 1];
@@ -727,24 +730,131 @@ public class TimetableGA {
             }
         }
 
-        // TODO: 整理老師每周最低上課時數的數據，可用 csv 檔匯入
-        // TODO: SC3: 平衡教師不需要工作的天數 (19)
-        // TODO: SC3: 平衡教師不需要工作的天數 (20)
-        // TODO: SC4: 降低教師每周的實際工作節次數 (22)
-        // TODO: SC4: 降低教師每周的實際工作節次數 (23)
-        // TODO: SC5: 降低教師於上午四節的連續排課數量 - owner: chloe
-        // TODO: SC6: 降低教師下午三節的連續排課數量 - owner: chloe
-        // TODO: SC7: 降低教師午休時間前後的連續排課數量 - owner: chloe
+
+        // 整理老師每周最低上課時數的數據，可用 csv 檔匯入
+        // 記錄老師每周最低上課時數的數據 (minTeachingTime.csv)
+        int O[] = new int[TEACHER_CNT+ 1];
+        try (var fr = new FileReader("src/main/resources/minTeachingTime.csv", StandardCharsets.UTF_8);
+             var reader = new CSVReader(fr)) {
+            int stringIndex = 0;
+            String[] nextLine;
+            while ((nextLine = reader.readNext()) != null) {
+                for (int i = 1; i < O.length; i++) {
+                    O[i] = Integer.parseInt(nextLine[stringIndex]);
+                    stringIndex++;
+                }
+            }
+        }
+        // SC3: 平衡教師不需要工作的天數 (19)
+        double MD[][] = new double[POPULATION_SIZE+1][TEACHER_CNT+1];
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                MD[popIndex][tid] = O[tid] / (PERIOD_CNT+1);
+            }
+        }
+
+        // SC3: 平衡教師不需要工作的天數 (20)
+        double BETA[] = new double[POPULATION_SIZE+1];
+        double extra[][] = new double[POPULATION_SIZE+1][TEACHER_CNT+1];
+        for(int popIndex = 0; popIndex<((POPULATION_SIZE+1));popIndex++){
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                extra[popIndex][tid] = D[popIndex][tid] = MD[popIndex][tid];
+                if(extra[popIndex][tid]>BETA[popIndex]){
+                    BETA[popIndex] = extra[popIndex][tid];
+                }
+
+            }
+        }
+
+        // SC4: 降低教師每周的實際工作節次數 (22)
+        double M[][] = new double[POPULATION_SIZE+1][TEACHER_CNT+1];   //老師t一周實際工作節次數量
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                for( int day = 1; day<(DAY_CNT+1);day++) {
+                    for (int period = 1; period < (PERIOD_CNT + 1); period++) {
+                        M[popIndex][tid] += teacherActualTimetable[popIndex][tid][day][period];
+                    }
+                }
+            }
+        }
+        // SC4: 降低教師每周的實際工作節次數 (23)
+        double teacherExtraPeriods [][] = new double[POPULATION_SIZE+1][TEACHER_CNT+1];
+        double BETA1[] = new double[POPULATION_SIZE+1];
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+
+                teacherExtraPeriods[popIndex][tid] = M[popIndex][tid] - O[tid];
+                if(teacherExtraPeriods[popIndex][tid]>BETA1[popIndex])
+                    BETA1[popIndex] = teacherExtraPeriods[popIndex][tid];
+            }
+        }
+        // SC5: 降低教師於上午四節的連續排課數量 - owner: chloe
+        double U []= new double[POPULATION_SIZE + 1];
+        double teacherCalsPeriods[][][]= new double[POPULATION_SIZE + 1][TEACHER_CNT + 1][DAY_CNT + 1];
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                for (int day = 1; day < (DAY_CNT + 1); day++) {
+
+                    //降低上午四節的連續排課數量
+                    for (int period = 1; period < 5 ; period++) {  //FIXME :5
+                        teacherCalsPeriods[popIndex][tid][day]+= teacherActualTimetable[popIndex][tid][day][period];
+                    }
+
+                    if (teacherCalsPeriods[popIndex][tid][day] > U[popIndex])
+                        U[popIndex] = teacherCalsPeriods[popIndex][tid][day];
+                }
+
+            }
+        }
+        // SC6: 降低教師下午三節的連續排課數量 - owner: chloe
+        double V[] = new double[POPULATION_SIZE+1];
+        double teacherCalsPeriods2[][][] = new double[POPULATION_SIZE + 1][TEACHER_CNT + 1][DAY_CNT + 1];
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                for (int day = 1; day < (DAY_CNT + 1); day++) {
+
+                    //降低下午三節的連續排課數量
+                    for (int period = 5; period <(PERIOD_CNT+1) ; period++) {  //ATTENTION :5
+                        teacherCalsPeriods2[popIndex][tid][day]+= teacherActualTimetable[popIndex][tid][day][period];
+                    }
+
+                    if (teacherCalsPeriods2[popIndex][tid][day] > V[popIndex])
+                        V[popIndex] = teacherCalsPeriods2[popIndex][tid][day];
+                }
+
+            }
+        }
+        // SC7: 降低教師午休時間前後的連續排課數量 - owner: chloe
+        double  W[] = new double[POPULATION_SIZE+1];
+        double teacherCalsPeriods3[][][] = new double[POPULATION_SIZE + 1][TEACHER_CNT + 1][DAY_CNT + 1];
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                for (int day = 1; day < (DAY_CNT + 1); day++) {
+
+                    //降低午休前後的連續排課數量
+                    for (int period = 4; period <5 ; period++) {  //ATTENTION :4,5
+                        teacherCalsPeriods3[popIndex][tid][day]+= teacherActualTimetable[popIndex][tid][day][period];
+                    }
+
+                    if (teacherCalsPeriods3[popIndex][tid][day] > W[popIndex])
+                        W[popIndex] = teacherCalsPeriods3[popIndex][tid][day];
+                }
+
+            }
+        }
 
         // 加總上面的分數
         double totalFitness = 0.0;
-        // 各參數比重先寫死，之後可再優化
-        // TODO: 還需要 alpha3 - alpha7
+
         double alpha1 = 1;
         double alpha2 = 1;
+        double alpha3 = 1;
+        double alpha4 = 1;
+        double alpha5 = 1;
+        double alpha6 = 1;
+        double alpha7 = 1;
         for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
-            // TODO: 等 SC3 - SC4 完成後要修改此處
-            objectVal[popIndex] = alpha1 * fitnessJ[popIndex] + alpha2 * fitnessY[popIndex];
+            objectVal[popIndex] = alpha1 * fitnessJ[popIndex] + alpha2 * fitnessY[popIndex]+alpha3*BETA[popIndex]+alpha4*BETA1[popIndex]+alpha5*U[popIndex]+alpha6*V[popIndex]+alpha7*W[popIndex];
             // 適應值為目標值的倒數
             fitness[popIndex] = 1.0 / objectVal[popIndex];
             totalFitness += fitness[popIndex];
@@ -754,47 +864,49 @@ public class TimetableGA {
         int generation = 0;
         while (generation < MAX_GENERATIONS) {
             // 先照 fitness 值由大到小排序
-            for (int popIndexA = 0; popIndexA < (POPULATION_SIZE + 1); popIndexA++) {
+            for (int popIndexA = 0; popIndexA < (POPULATION_SIZE + 1 - 1); popIndexA++) {
+                int maxIdx = popIndexA;
                 for (int popIndexB = (popIndexA + 1); popIndexB < (POPULATION_SIZE + 1); popIndexB++) {
-                    if (fitness[popIndexA] < fitness[popIndexB]) {
-                        // 換 fitness 的順序
-                        double temp_fitness = fitness[popIndexA];
-                        fitness[popIndexA] = fitness[popIndexB];
-                        fitness[popIndexB] = temp_fitness;
-                        // 換 teacherActualTimetable
-                        int[][][] temp_teacherActualTimetable = Arrays.copyOf(teacherActualTimetable[popIndexA], teacherActualTimetable.length);
-                        teacherActualTimetable[popIndexA] = Arrays.copyOf(teacherActualTimetable[popIndexB], teacherActualTimetable[popIndexB].length);
-                        teacherActualTimetable[popIndexB] = Arrays.copyOf(temp_teacherActualTimetable, temp_teacherActualTimetable.length);
-                        // 換 classSubjectCnt
-                        int[][] temp_classSubjectCnt = Arrays.copyOf(classSubjectCnt[popIndexA], classSubjectCnt[popIndexA].length);
-                        classSubjectCnt[popIndexA] = Arrays.copyOf(classSubjectCnt[popIndexB], classSubjectCnt[popIndexB].length);
-                        classSubjectCnt[popIndexB] = Arrays.copyOf(temp_classSubjectCnt, temp_classSubjectCnt.length);
-                        // 換 subjectRoomCnt
-                        int[][][] temp_subjectRoomCnt = Arrays.copyOf(subjectRoomCnt[popIndexA], subjectRoomCnt[popIndexA].length);
-                        subjectRoomCnt[popIndexA] = Arrays.copyOf(subjectRoomCnt[popIndexB], subjectRoomCnt[popIndexB].length);
-                        subjectRoomCnt[popIndexB] = Arrays.copyOf(temp_subjectRoomCnt, temp_subjectRoomCnt.length);
-                        // 換 classSubjectTable
-                        int[][][] temp_classSubjectTable = Arrays.copyOf(classSubjectTable[popIndexA], classSubjectTable[popIndexA].length);
-                        classSubjectTable[popIndexA] = Arrays.copyOf(classSubjectTable[popIndexB], classSubjectTable[popIndexB].length);
-                        classSubjectTable[popIndexB] = Arrays.copyOf(temp_classSubjectTable, temp_classSubjectTable.length);
-                        // 換 classTeacherTable
-                        int[][][] temp_classTeacherTable = Arrays.copyOf(classTeacherTable[popIndexA], classAssignedTeacher[popIndexA].length);
-                        classTeacherTable[popIndexA] = Arrays.copyOf(classTeacherTable[popIndexB], classTeacherTable[popIndexB].length);
-                        classTeacherTable[popIndexB] = Arrays.copyOf(temp_classTeacherTable, classTeacherTable.length);
-                        // 換 classAssignedTeache
-                        int[][] temp_classAssignedTeacher = Arrays.copyOf(classAssignedTeacher[popIndexA], classAssignedTeacher[popIndexA].length);
-                        classAssignedTeacher[popIndexA] = Arrays.copyOf(classAssignedTeacher[popIndexB], classAssignedTeacher[popIndexB].length);
-                        classAssignedTeacher[popIndexB] = Arrays.copyOf(temp_classAssignedTeacher, temp_classAssignedTeacher.length);
+                    if (fitness[popIndexA] > fitness[popIndexB]) {
+                        maxIdx = popIndexB;
                     }
                 }
+                // 換 fitness 的順序
+                double temp_fitness = fitness[maxIdx];
+                fitness[maxIdx] = fitness[popIndexA];
+                fitness[popIndexA] = temp_fitness;
+                // 換 teacherActualTimetable
+                int[][][] temp_teacherActualTimetable = Arrays.copyOf(teacherActualTimetable[maxIdx], teacherActualTimetable[maxIdx].length);
+                teacherActualTimetable[maxIdx] = Arrays.copyOf(teacherActualTimetable[popIndexA], teacherActualTimetable[popIndexA].length);
+                teacherActualTimetable[popIndexA] = Arrays.copyOf(temp_teacherActualTimetable, temp_teacherActualTimetable.length);
+                // 換 classSubjectCnt
+                int[][] temp_classSubjectCnt = Arrays.copyOf(classSubjectCnt[maxIdx], classSubjectCnt[maxIdx].length);
+                classSubjectCnt[maxIdx] = Arrays.copyOf(classSubjectCnt[popIndexA], classSubjectCnt[popIndexA].length);
+                classSubjectCnt[popIndexA] = Arrays.copyOf(temp_classSubjectCnt, temp_classSubjectCnt.length);
+                // 換 subjectRoomCnt
+                int[][][] temp_subjectRoomCnt = Arrays.copyOf(subjectRoomCnt[maxIdx], subjectRoomCnt[maxIdx].length);
+                subjectRoomCnt[maxIdx] = Arrays.copyOf(subjectRoomCnt[popIndexA], subjectRoomCnt[popIndexA].length);
+                subjectRoomCnt[popIndexA] = Arrays.copyOf(temp_subjectRoomCnt, temp_subjectRoomCnt.length);
+                // 換 classSubjectTable
+                int[][][] temp_classSubjectTable = Arrays.copyOf(classSubjectTable[maxIdx], classSubjectTable[maxIdx].length);
+                classSubjectTable[maxIdx] = Arrays.copyOf(classSubjectTable[popIndexA], classSubjectTable[popIndexA].length);
+                classSubjectTable[popIndexA] = Arrays.copyOf(temp_classSubjectTable, temp_classSubjectTable.length);
+                // 換 classTeacherTable
+                int[][][] temp_classTeacherTable = Arrays.copyOf(classTeacherTable[maxIdx], classTeacherTable[maxIdx].length);
+                classTeacherTable[maxIdx] = Arrays.copyOf(classTeacherTable[popIndexA], classTeacherTable[popIndexA].length);
+                classTeacherTable[popIndexA] = Arrays.copyOf(temp_classTeacherTable, temp_classTeacherTable.length);
+                // 換 classAssignedTeache
+                int[][] temp_classAssignedTeacher = Arrays.copyOf(classAssignedTeacher[maxIdx], classAssignedTeacher[maxIdx].length);
+                classAssignedTeacher[maxIdx] = Arrays.copyOf(classAssignedTeacher[popIndexA], classAssignedTeacher[popIndexA].length);
+                classAssignedTeacher[popIndexA] = Arrays.copyOf(temp_classAssignedTeacher, temp_classAssignedTeacher.length);
             }
 
-            int[][][][] children_teacherActualTimetable = new int[POPULATION_SIZE + 1][][][];
-            int[][][] children_classSubjectCnt = new int[POPULATION_SIZE + 1][][];
-            int[][][][] children_subjectRoomCnt = new int[POPULATION_SIZE + 1][][][];
-            int[][][][] children_classSubjectTable = new int[POPULATION_SIZE + 1][][][];
-            int[][][][] children_classTeacherTable = new int[POPULATION_SIZE + 1][][][];
-            int[][][] children_classAssignedTeacher = new int [POPULATION_SIZE + 1][][];
+            int[][][][] children_teacherActualTimetable = new int[POPULATION_SIZE + 1][TEACHER_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+            int[][][] children_classSubjectCnt = new int[POPULATION_SIZE + 1][CLASS_CNT + 1][SUBJECT_CNT + 1];
+            int[][][][] children_subjectRoomCnt = new int[POPULATION_SIZE + 1][SUBJECT_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+            int[][][][] children_classSubjectTable = new int[POPULATION_SIZE + 1][CLASS_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+            int[][][][] children_classTeacherTable = new int[POPULATION_SIZE + 1][CLASS_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+            int[][][] children_classAssignedTeacher = new int[POPULATION_SIZE + 1][CLASS_CNT + 1][SUBJECT_CNT + 1];
 
             // 先保留 elite size 的數量
             for (int popIndex = 0; popIndex < ELITISM_COUNT; popIndex++) {
@@ -808,6 +920,9 @@ public class TimetableGA {
 
             int pidx = ELITISM_COUNT;
             while (pidx < (fitness.length - ELITISM_COUNT)) {
+
+                System.out.println("Running crossover...");
+
                 // 以輪盤法選擇交配使用的 2 個父代的 population
                 double[] cumulative_sum = new double[POPULATION_SIZE + 1];
                 double[] cumulative_prec = new double[POPULATION_SIZE + 1];
@@ -826,58 +941,59 @@ public class TimetableGA {
                 // range: 1 - 100
                 int randomInt1 = r.nextInt(100) + 1;
                 for (int i = 0; i < (POPULATION_SIZE + 1); i++) {
-                    if (randomInt1 < cumulative_prec[i]) {
+                    if (randomInt1 <= cumulative_prec[i]) {
                         parentIndex1 = i;
+                        break;
                     }
                 }
                 int randomInt2 = r.nextInt(100) + 1;
+                while (randomInt2 == randomInt1) {
+                    randomInt2 = r.nextInt(100) + 1;
+                }
                 for (int i = 0; i < (POPULATION_SIZE + 1); i++) {
-                    if (randomInt2 < cumulative_prec[i]) {
+                    if (randomInt2 <= cumulative_prec[i]) {
                         parentIndex2 = i;
+                        break;
                     }
                 }
 
-                // TODO: 2 個父代的 population 交配
-                // 選擇一個要拿來交配的班級
-                int selectClassId = r.nextInt(CLASS_CNT) + 1;
-                // 先複製其他不用交配的子代
-                // 老師可以的時間以 parentIndex1 為主
-                // 先複製要交配以外的班級，複製 parentIndex1 的課程、任課老師、教室
-                for (int cidx = 1; cidx < (CLASS_CNT + 1); cidx++) {
-                    if (cidx == selectClassId) {
-                        continue;
-                    }
-                    for (int s = 1; s < (SUBJECT_CNT + 1); s++) {
-                        children_classSubjectCnt[pidx][cidx][s] = classSubjectCnt[parentIndex1][cidx][s];
-                        children_classAssignedTeacher[pidx][cidx][s] = classAssignedTeacher[parentIndex1][cidx][s];
-                    }
-                }
-                for (int cidx = 1; cidx < CLASS_CNT + 1; cidx++) {
-                    if (cidx == selectClassId) {
-                        continue;
-                    }
-                    for (int d = 1; d < (DAY_CNT + 1); d++) {
-                        for (int p = 1; p < (PERIOD_CNT + 1); p++) {
-                            children_classSubjectTable[pidx][cidx][d][p] = classSubjectTable[parentIndex1][cidx][p][d];
-                            children_classTeacherTable[pidx][cidx][d][p] = classTeacherTable[parentIndex1][cidx][p][d];
-                            int sidx = classSubjectTable[parentIndex1][cidx][d][p];
-                            children_subjectRoomCnt[pidx][sidx][d][p]++;
-                            int tidx = classTeacherTable[parentIndex1][cidx][d][p];
-                            children_teacherActualTimetable[pidx][tidx][d][p]++;
+                // 2 個父代的 population 交配
+                // 選擇一個要拿來交配的班級候選號碼
+                int selectedClassId = r.nextInt(CLASS_CNT) + 1;
+//                System.out.println("selectedClassId: " + selectedClassId);
+                // 決定這個班級是否要交配
+                // 被選中的班級要交配
+                if (CROSSOVER_RATE > (Math.random())) {
+                    System.out.println("\tCrossover population " + pidx);
+                    // 先複製其他不用交配的子代
+                    // 老師可以的時間以 parentIndex1 為主
+                    // 先複製要交配以外的班級，複製 parentIndex1 的課程、任課老師、教室
+                    for (int cidx = 1; cidx < (CLASS_CNT + 1); cidx++) {
+                        if (cidx == selectedClassId) {
+                            continue;
+                        }
+                        for (int s = 1; s < (SUBJECT_CNT + 1); s++) {
+                            children_classSubjectCnt[pidx][cidx][s] = classSubjectCnt[parentIndex1][cidx][s];
+                            children_classAssignedTeacher[pidx][cidx][s] = classAssignedTeacher[parentIndex1][cidx][s];
                         }
                     }
-                }
-                // 開始處理被選中要交配的班級
-                // 固定課程 & 體育課照 parentIndex1
-                // 其他每一個課程都檢查要不要交配
-                // 如果已經填滿就跳過
-                // 再把還沒填的科目依序補滿 (用上面的方法)
-                // 如果發現填不滿，就重新跑跑看
-
-                int selectedClassFailureCnt = 0;
-                boolean isArrangingSelectedClass = true;
-                REARRANGE_SELECTED_CLASS:
-                while (isArrangingSelectedClass) {
+                    for (int cidx = 1; cidx < CLASS_CNT + 1; cidx++) {
+                        if (cidx == selectedClassId) {
+                            continue;
+                        }
+                        for (int d = 1; d < (DAY_CNT + 1); d++) {
+                            for (int p = 1; p < (PERIOD_CNT + 1); p++) {
+                                children_classSubjectTable[pidx][cidx][d][p] = classSubjectTable[parentIndex1][cidx][d][p];
+                                children_classTeacherTable[pidx][cidx][d][p] = classTeacherTable[parentIndex1][cidx][d][p];
+                                int sidx = classSubjectTable[parentIndex1][cidx][d][p];
+                                children_subjectRoomCnt[pidx][sidx][d][p]++;
+                                int tidx = classTeacherTable[parentIndex1][cidx][d][p];
+                                children_teacherActualTimetable[pidx][tidx][d][p]++;
+                            }
+                        }
+                    }
+                    // 開始處理被選中要交配的班級
+                    // 固定課程 & 體育課照 parentIndex1
                     // 班會、周會、聯課、體育課
                     int classMeetingId = 22;
                     int classMeetingDay = 1;
@@ -893,29 +1009,29 @@ public class TimetableGA {
                     int pePeriod = 0;
                     for (int subjectIndex = 1; subjectIndex < (SUBJECT_CNT + 1); subjectIndex++) {
                         if (subjectIndex == classMeetingId) {
-                            children_classSubjectTable[pidx][selectClassId][classMeetingDay][classMeetingPeriod] = classMeetingId;
-                            children_classSubjectCnt[pidx][selectClassId][classMeetingId]++;
-                            int tid = classAssignedTeacher[parentIndex1][selectClassId][classMeetingId];
-                            children_classAssignedTeacher[pidx][selectClassId][classMeetingId] = tid;
-                            children_classTeacherTable[pidx][selectClassId][classMeetingDay][classMeetingPeriod] = tid;
+                            children_classSubjectTable[pidx][selectedClassId][classMeetingDay][classMeetingPeriod] = classMeetingId;
+                            children_classSubjectCnt[pidx][selectedClassId][classMeetingId]++;
+                            int tid = classAssignedTeacher[parentIndex1][selectedClassId][classMeetingId];
+                            children_classAssignedTeacher[pidx][selectedClassId][classMeetingId] = tid;
+                            children_classTeacherTable[pidx][selectedClassId][classMeetingDay][classMeetingPeriod] = tid;
                             children_teacherActualTimetable[pidx][tid][classMeetingDay][classMeetingPeriod]++;
                             children_subjectRoomCnt[pidx][classMeetingId][classMeetingDay][classMeetingPeriod]++;
                         }
                         else if (subjectIndex == schoolMeetingId) {
-                            children_classSubjectTable[pidx][selectClassId][schoolMeetingDay][schoolMeetingPeriod] = schoolMeetingId;
-                            children_classSubjectCnt[pidx][selectClassId][schoolMeetingId]++;
-                            int tid = classAssignedTeacher[parentIndex1][selectClassId][schoolMeetingId];
-                            children_classAssignedTeacher[pidx][selectClassId][schoolMeetingId] = tid;
-                            children_classTeacherTable[pidx][selectClassId][schoolMeetingDay][schoolMeetingPeriod] = tid;
+                            children_classSubjectTable[pidx][selectedClassId][schoolMeetingDay][schoolMeetingPeriod] = schoolMeetingId;
+                            children_classSubjectCnt[pidx][selectedClassId][schoolMeetingId]++;
+                            int tid = classAssignedTeacher[parentIndex1][selectedClassId][schoolMeetingId];
+                            children_classAssignedTeacher[pidx][selectedClassId][schoolMeetingId] = tid;
+                            children_classTeacherTable[pidx][selectedClassId][schoolMeetingDay][schoolMeetingPeriod] = tid;
                             children_teacherActualTimetable[pidx][tid][schoolMeetingDay][schoolMeetingPeriod]++;
                             children_subjectRoomCnt[pidx][schoolMeetingId][schoolMeetingDay][schoolMeetingPeriod]++;
                         }
                         else if (subjectIndex == clubCourseId) {
-                            children_classSubjectTable[pidx][selectClassId][clubCourseDay][clubCoursePeriod] = clubCourseId;
-                            children_classSubjectCnt[pidx][selectClassId][clubCourseId]++;
-                            int tid = classAssignedTeacher[parentIndex1][selectClassId][clubCourseId];
-                            children_classAssignedTeacher[pidx][selectClassId][clubCourseId] = tid;
-                            children_classTeacherTable[pidx][selectClassId][clubCourseDay][clubCoursePeriod] = tid;
+                            children_classSubjectTable[pidx][selectedClassId][clubCourseDay][clubCoursePeriod] = clubCourseId;
+                            children_classSubjectCnt[pidx][selectedClassId][clubCourseId]++;
+                            int tid = classAssignedTeacher[parentIndex1][selectedClassId][clubCourseId];
+                            children_classAssignedTeacher[pidx][selectedClassId][clubCourseId] = tid;
+                            children_classTeacherTable[pidx][selectedClassId][clubCourseDay][clubCoursePeriod] = tid;
                             children_teacherActualTimetable[pidx][tid][clubCourseDay][clubCoursePeriod]++;
                             children_subjectRoomCnt[pidx][clubCourseId][clubCourseDay][clubCoursePeriod]++;
                         }
@@ -923,8 +1039,8 @@ public class TimetableGA {
                             // 找 parentIndex1 第一節體育課的時間
                             for (int d = 1; d < (DAY_CNT + 1); d++) {
                                 for (int p = 1; p < (PERIOD_CNT + 1); p++) {
-                                    if (classSubjectTable[parentIndex1][selectClassId][d][p] == peId) {
-                                        if (classSubjectTable[parentIndex1][selectClassId][d][p + 1] == peId) {
+                                    if (classSubjectTable[parentIndex1][selectedClassId][d][p] == peId) {
+                                        if (classSubjectTable[parentIndex1][selectedClassId][d][p + 1] == peId) {
                                             peDay = d;
                                             pePeriod = p;
                                             break;
@@ -932,32 +1048,500 @@ public class TimetableGA {
                                     }
                                 }
                             }
-                            children_classSubjectTable[pidx][selectClassId][peDay][pePeriod] = peId;
-                            children_classSubjectTable[pidx][selectClassId][peDay][pePeriod + 1] = peId;
-                            children_classSubjectCnt[pidx][selectClassId][clubCourseId] += 2;
-                            int tid = classAssignedTeacher[parentIndex1][selectClassId][peId];
-                            children_classAssignedTeacher[pidx][selectClassId][peId] = tid;
-                            children_classTeacherTable[pidx][selectClassId][peDay][pePeriod] = tid;
-                            children_classTeacherTable[pidx][selectClassId][peDay][pePeriod + 1] = tid;
+                            children_classSubjectTable[pidx][selectedClassId][peDay][pePeriod] = peId;
+                            children_classSubjectTable[pidx][selectedClassId][peDay][pePeriod + 1] = peId;
+                            children_classSubjectCnt[pidx][selectedClassId][clubCourseId] += 2;
+                            int tid = classAssignedTeacher[parentIndex1][selectedClassId][peId];
+                            children_classAssignedTeacher[pidx][selectedClassId][peId] = tid;
+                            children_classTeacherTable[pidx][selectedClassId][peDay][pePeriod] = tid;
+                            children_classTeacherTable[pidx][selectedClassId][peDay][pePeriod + 1] = tid;
                             children_teacherActualTimetable[pidx][tid][peDay][pePeriod]++;
                             children_teacherActualTimetable[pidx][tid][peDay][pePeriod + 1]++;
                             children_subjectRoomCnt[pidx][peId][peDay][pePeriod]++;
                             children_subjectRoomCnt[pidx][peId][peDay][pePeriod + 1]++;
                         }
-                        // TODO: 安排班會、周會、聯課、體育課以外的單堂課程
-                        else {
-                            // Q: 要不要建立 temp 暫存還沒安排好的班級課表？
+                    }
+                    // 安排被選中的班級班會、周會、聯課、體育課以外的單堂課程
+                    int selectedClassFailureCnt = 0;
+                    boolean isArrangingSelectedClass = true;
+                    REARRANGE_SELECTED_CLASS:
+                    while (isArrangingSelectedClass) {
+                        boolean arrangeSelectedClassAgain = false;
+                        int[][][] temp1_teacherActualTimetable = new int[TEACHER_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+                        int[][] temp1_classSubjectCnt = new int [CLASS_CNT + 1][SUBJECT_CNT + 1];
+                        int[][][] temp1_subjectRoomCnt = new int[SUBJECT_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+                        int[][][] temp1_classSubjectTable = new int[CLASS_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+                        int[][][] temp1_classTeacherTable = new int[CLASS_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+                        int[][] temp1_classAssignedTeacher = new int[CLASS_CNT + 1][SUBJECT_CNT + 1];
+                        // 複製前面被選定的班級的固定課程 & 體育課的陣列
+                        for (int classIndex = 1; classIndex < (CLASS_CNT + 1); classIndex++) {
+                            for (int t = 0; t < (TEACHER_CNT + 1); t++) {
+                                for (int d = 0; d < (DAY_CNT + 1); d++) {
+                                    for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                                        temp1_teacherActualTimetable[t][d][p] = children_teacherActualTimetable[pidx][t][d][p];
+                                    }
+                                }
+                            }
+                            for (int c = 0; c < (CLASS_CNT + 1); c++) {
+                                for (int s = 0; s < (SUBJECT_CNT + 1); s++) {
+                                    temp1_classSubjectCnt[c][s] = children_classSubjectCnt[pidx][c][s];
+                                    temp1_classAssignedTeacher[c][s] = children_classAssignedTeacher[pidx][c][s];
+                                }
+                            }
+                            for (int s = 0; s < (SUBJECT_CNT + 1); s++) {
+                                for (int d = 0; d < (DAY_CNT + 1); d++) {
+                                    for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                                        temp1_subjectRoomCnt[s][d][p] = children_subjectRoomCnt[pidx][s][d][p];
+                                    }
+                                }
+                            }
+                            for (int c = 0; c < (CLASS_CNT + 1); c++) {
+                                for (int d = 0; d < (DAY_CNT + 1); d++) {
+                                    for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                                        temp1_classSubjectTable[c][d][p] = children_classSubjectTable[pidx][c][d][p];
+                                        temp1_classTeacherTable[c][d][p] = children_classTeacherTable[pidx][c][d][p];
+                                    }
+                                }
+                            }
+                        }
+
+                        for (int d = 1; d < (DAY_CNT + 1); d++) {
+                            for (int p = 1; p < (PERIOD_CNT + 1); p++) {
+                                // 略過班會、周會、聯課、體育課
+                                int subjectIndex = temp1_classSubjectTable[selectedClassId][d][p];
+                                if (subjectIndex == classMeetingId || subjectIndex == schoolMeetingId ||
+                                        subjectIndex == clubCourseId || subjectIndex == peId) {
+                                    continue ;
+                                }
+                                else if (subjectIndex != 0) {
+                                    System.out.println("Error: pidx " + pidx + " select " + selectedClassId + " d " + d + " p " + p + " is not null.");
+                                }
+                                // 檢查其他每一節課 parent1 & parent2 是否交換
+                                // 如果已經填滿就跳過
+                                if (CROSSOVER_RATE > (Math.random())) {
+                                    subjectIndex = classSubjectTable[parentIndex2][selectedClassId][d][p];
+                                    int tid = classAssignedTeacher[parentIndex1][selectedClassId][subjectIndex];
+                                    boolean tooMany, noEmptyRoom, invalidForTeacher;
+                                    tooMany = temp1_classSubjectCnt[selectedClassId][subjectIndex] >= subjectFixedCnt[gradeOfClass[selectedClassId]][subjectIndex];
+                                    noEmptyRoom = temp1_subjectRoomCnt[subjectIndex][d][p] >= subjectRoomLimit[subjectIndex];
+                                    invalidForTeacher = temp1_teacherActualTimetable[tid][d][p] != 0;
+                                    // 該課程節數已排滿，跳過
+                                    if (tooMany) {
+//                                        System.out.println("Skip d " + d + " p " + p + " subjectIndex " + subjectIndex + " 's classes are too many");
+                                        // 記錄該課程的時間
+                                        continue;
+                                    }
+                                    else if (noEmptyRoom || invalidForTeacher) {
+                                        // 無法交換，用 parent1 的
+                                        subjectIndex = classSubjectTable[parentIndex1][selectedClassId][d][p];
+                                        tid = classTeacherTable[parentIndex1][selectedClassId][d][p];
+                                        // 記錄該課程的時間
+                                        temp1_classSubjectTable[selectedClassId][d][p] = subjectIndex;
+                                        temp1_classSubjectCnt[selectedClassId][subjectIndex]++;
+                                        // 記錄該課程的老師
+                                        if (temp1_classAssignedTeacher[selectedClassId][subjectIndex] == 0) {
+                                            temp1_classAssignedTeacher[selectedClassId][subjectIndex] = tid;
+                                        }
+                                        temp1_classTeacherTable[selectedClassId][d][p] = tid;
+                                        temp1_teacherActualTimetable[tid][d][p]++;
+                                        // 記錄該課程的教室
+                                        temp1_subjectRoomCnt[subjectIndex][d][p]++;
+                                    }
+                                    // 該節課交換
+                                    else {
+                                        // System.out.println("Turn d " + d + " p " + p + " 's subject " + classSubjectTable[parentIndex1][selectedClassId][d][p] + " to " + subjectIndex);
+                                        // 記錄該課程的時間
+                                        temp1_classSubjectTable[selectedClassId][d][p] = subjectIndex;
+                                        temp1_classSubjectCnt[selectedClassId][subjectIndex]++;
+                                        // 記錄該課程的老師
+                                        if (temp1_classAssignedTeacher[selectedClassId][subjectIndex] == 0) {
+                                            temp1_classAssignedTeacher[selectedClassId][subjectIndex] = tid;
+                                        }
+                                        temp1_classTeacherTable[selectedClassId][d][p] = tid;
+                                        temp1_teacherActualTimetable[tid][d][p]++;
+                                        // 記錄該課程的教室
+                                        temp1_subjectRoomCnt[subjectIndex][d][p]++;
+                                    }
+                                }
+                                // 如果該節課沒有交換，用 parent1 的
+                                else {
+                                    subjectIndex = classSubjectTable[parentIndex1][selectedClassId][d][p];
+                                    int tid = classTeacherTable[parentIndex1][selectedClassId][d][p];
+                                    // 記錄該課程的時間
+                                    temp1_classSubjectTable[selectedClassId][d][p] = subjectIndex;
+                                    temp1_classSubjectCnt[selectedClassId][subjectIndex]++;
+                                    // 記錄該課程的老師
+                                    if (temp1_classAssignedTeacher[selectedClassId][subjectIndex] == 0) {
+                                        temp1_classAssignedTeacher[selectedClassId][subjectIndex] = tid;
+                                    }
+                                    temp1_classTeacherTable[selectedClassId][d][p] = tid;
+                                    temp1_teacherActualTimetable[tid][d][p]++;
+                                    // 記錄該課程的教室
+                                    temp1_subjectRoomCnt[subjectIndex][d][p]++;
+                                }
+                            }
+                        }
+
+                        // 交配完後，修補被選中要交配的班級的課表 (用上面建立初始解的方法)
+                        // 如果發現填不滿，就重新跑跑看
+                        for (int subjectIndex = 1; subjectIndex < (SUBJECT_CNT + 1); subjectIndex++) {
+                            // 略過班會、周會、聯課、體育課
+                            if (subjectIndex == classMeetingId || subjectIndex == schoolMeetingId ||
+                                    subjectIndex == clubCourseId || subjectIndex == peId) {
+                                continue ;
+                            }
+
+                            int tempClassFailureCnt = 0;
+                            boolean isArrangingTempClass = true;
+                            REARRANGE_TEMP_CLASS:
+                            while (isArrangingTempClass) {
+                                int[][][] temp2_teacherActualTimetable = new int[TEACHER_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+                                int[][] temp2_classSubjectCnt = new int [CLASS_CNT + 1][SUBJECT_CNT + 1];
+                                int[][][] temp2_subjectRoomCnt = new int[SUBJECT_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+                                int[][][] temp2_classSubjectTable = new int[CLASS_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+                                int[][][] temp2_classTeacherTable = new int[CLASS_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+                                int[][] temp2_classAssignedTeacher = new int[CLASS_CNT + 1][SUBJECT_CNT + 1];
+                                // 複製 temp1 的陣列
+                                for (int t = 0; t < (TEACHER_CNT + 1); t++) {
+                                    for (int d = 0; d < (DAY_CNT + 1); d++) {
+                                        for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                                            temp2_teacherActualTimetable[t][d][p] = temp1_teacherActualTimetable[t][d][p];
+                                        }
+                                    }
+                                }
+                                for (int c = 0; c < (CLASS_CNT + 1); c++) {
+                                    for (int s = 0; s < (SUBJECT_CNT + 1); s++) {
+                                        temp2_classSubjectCnt[c][s] = temp1_classSubjectCnt[c][s];
+                                        temp2_classAssignedTeacher[c][s] = temp1_classAssignedTeacher[c][s];
+                                    }
+                                }
+                                for (int s = 0; s < (SUBJECT_CNT + 1); s++) {
+                                    for (int d = 0; d < (DAY_CNT + 1); d++) {
+                                        for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                                            temp2_subjectRoomCnt[s][d][p] = temp1_subjectRoomCnt[s][d][p];
+                                        }
+                                    }
+                                }
+                                for (int c = 0; c < (CLASS_CNT + 1); c++) {
+                                    for (int d = 0; d < (DAY_CNT + 1); d++) {
+                                        for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                                            temp2_classSubjectTable[c][d][p] = temp1_classSubjectTable[c][d][p];
+                                            temp2_classTeacherTable[c][d][p] = temp1_classTeacherTable[c][d][p];
+                                        }
+                                    }
+                                }
+
+                                boolean arrangeTempClassAgain = false;
+
+                                for (int classIndex = 1; classIndex < (CLASS_CNT + 1); classIndex++) {
+
+                                    // 略過班會、周會、聯課、體育課
+                                    if (subjectIndex == classMeetingId || subjectIndex == schoolMeetingId ||
+                                            subjectIndex == clubCourseId || subjectIndex == peId) {
+                                        continue ;
+                                    }
+
+                                    while (temp2_classSubjectCnt[classIndex][subjectIndex] < subjectFixedCnt[gradeOfClass[classIndex]][subjectIndex]) {
+                                        // 重排條件 1
+                                        if (selectedClassFailureCnt > 1000) {
+//                                            System.out.println("\tJump to REARRANGE_SELECTED_CLASS");
+                                            arrangeSelectedClassAgain = true;
+                                            selectedClassFailureCnt = 0;
+                                            break;
+                                        }
+
+                                        // 選單堂課程的老師
+                                        int teacherId = 0;
+                                        ArrayList<Integer> randomNumberList = new ArrayList<>();
+                                        for (int i = 1; i <= TEACHER_CNT; i++) {
+                                            randomNumberList.add(i);
+                                        }
+                                        Collections.shuffle(randomNumberList);
+                                        int listIndex = 0;
+                                        do {
+                                            if (temp2_classAssignedTeacher[classIndex][subjectIndex] == 0) {
+                                                // 如果沒有老師能配合該班級上課
+                                                if (listIndex >= randomNumberList.size()) {
+                                                    arrangeTempClassAgain = true;
+                                                    tempClassFailureCnt++;
+                                                    break;
+                                                }
+                                                teacherId = randomNumberList.get(listIndex);
+                                                listIndex++;
+                                            }
+                                            else {
+                                                teacherId = temp2_classAssignedTeacher[classIndex][subjectIndex];
+                                            }
+                                        } while(teacherTeaching[teacherId][subjectIndex] == 0);
+                                        randomNumberList.clear();
+                                        if (arrangeTempClassAgain) {
+//                                            System.out.print("\tUnknown Error: ");
+//                                            System.out.println("Jump to REARRANGE_TEMP_CLASS when arrange class " + classIndex + "'s teacher for subject " + subjectIndex);
+                                            break;
+                                        }
+
+                                        // 選單堂課程的時間 (要班級 & 老師皆可以的時間)
+                                        int day = 0;
+                                        int period = 0;
+                                        boolean noEmptyRoom, invalidForClass, invalidForTeacher;
+                                        do {
+
+                                            if (day != 0 && period != 0) {
+                                                tempClassFailureCnt++;
+                                            }
+                                            // 如果持續找不到班級&老師能配對的時間，重新安排該班級的課程
+                                            if (tempClassFailureCnt > 3600) {
+                                                arrangeTempClassAgain = true;
+                                                selectedClassFailureCnt++;
+                                                tempClassFailureCnt = 0;
+                                                break;
+                                            }
+
+                                            day = ThreadLocalRandom.current().nextInt(1, DAY_CNT + 1);
+                                            period = ThreadLocalRandom.current().nextInt(1, PERIOD_CNT + 1);
+                                            noEmptyRoom = temp2_subjectRoomCnt[subjectIndex][day][period] >= subjectRoomLimit[subjectIndex];
+                                            invalidForClass = temp2_classSubjectTable[classIndex][day][period] != 0;
+                                            invalidForTeacher = temp2_teacherActualTimetable[teacherId][day][period] != 0;
+
+                                        } while (noEmptyRoom || invalidForClass || invalidForTeacher);
+                                        if (arrangeTempClassAgain) {
+//                                            System.out.println("\tJump to REARRANGE_TEMP_CLASS when arrange class " + classIndex + "'s time for subject " +  subjectIndex);
+                                            break;
+                                        }
+
+                                        // 記錄該課程的時間
+                                        temp2_classSubjectTable[classIndex][day][period] = subjectIndex;
+                                        temp2_classSubjectCnt[classIndex][subjectIndex]++;
+                                        // 記錄該課程的老師
+                                        if (temp2_classAssignedTeacher[classIndex][subjectIndex] == 0) {
+                                            temp2_classAssignedTeacher[classIndex][subjectIndex] = teacherId;
+                                        }
+                                        temp2_classTeacherTable[classIndex][day][period] = teacherId;
+                                        temp2_teacherActualTimetable[teacherId][day][period]++;
+                                        // 記錄該課程的教室
+                                        temp2_subjectRoomCnt[subjectIndex][day][period]++;
+                                    }
+
+                                    if (arrangeTempClassAgain) {
+                                        break;
+                                    }
+                                    if (arrangeSelectedClassAgain) {
+                                        break;
+                                    }
+                                }
+
+                                if (arrangeSelectedClassAgain) {
+                                    break;
+                                }
+                                if (arrangeTempClassAgain) {
+                                    continue REARRANGE_TEMP_CLASS;
+                                }
+
+                                isArrangingTempClass = false;
+
+                                // 確認該班級排課完畢才將 temp2 複製到 temp1 的陣列
+                                for (int t = 0; t < (TEACHER_CNT + 1); t++) {
+                                    for (int d = 0; d < (DAY_CNT + 1); d++) {
+                                        for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                                            temp1_teacherActualTimetable[t][d][p] = temp2_teacherActualTimetable[t][d][p];
+                                        }
+                                    }
+                                }
+                                for (int c = 0; c < (CLASS_CNT + 1); c++) {
+                                    for (int s = 0; s < (SUBJECT_CNT + 1); s++) {
+                                        temp1_classSubjectCnt[c][s] = temp2_classSubjectCnt[c][s];
+                                        temp1_classAssignedTeacher[c][s] = temp2_classAssignedTeacher[c][s];
+                                    }
+                                }
+                                for (int s = 0; s < (SUBJECT_CNT + 1); s++) {
+                                    for (int d = 0; d < (DAY_CNT + 1); d++) {
+                                        for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                                            temp1_subjectRoomCnt[s][d][p] = temp2_subjectRoomCnt[s][d][p];
+                                        }
+                                    }
+                                }
+                                for (int c = 0; c < (CLASS_CNT + 1); c++) {
+                                    for (int d = 0; d < (DAY_CNT + 1); d++) {
+                                        for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                                            temp1_classSubjectTable[c][d][p] = temp2_classSubjectTable[c][d][p];
+                                            temp1_classTeacherTable[c][d][p] = temp2_classTeacherTable[c][d][p];
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (arrangeSelectedClassAgain) {
+                                break;
+                            }
+                        }
+
+                        if (arrangeSelectedClassAgain) {
+                            continue REARRANGE_SELECTED_CLASS;
+                        }
+
+                        isArrangingSelectedClass = false;
+
+                        // 確認被選中的班級交配完畢才複製到 children 的陣列
+                        for (int t = 0; t < (TEACHER_CNT + 1); t++) {
+                            for (int d = 0; d < (DAY_CNT + 1); d++) {
+                                for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                                    children_teacherActualTimetable[pidx][t][d][p] = temp1_teacherActualTimetable[t][d][p];
+                                }
+                            }
+                        }
+                        for (int c = 0; c < (CLASS_CNT + 1); c++) {
+                            for (int s = 0; s < (SUBJECT_CNT + 1); s++) {
+                                children_classSubjectCnt[pidx][c][s] = temp1_classSubjectCnt[c][s];
+                                children_classAssignedTeacher[pidx][c][s] = temp1_classAssignedTeacher[c][s];
+                            }
+                        }
+                        for (int s = 0; s < (SUBJECT_CNT + 1); s++) {
+                            for (int d = 0; d < (DAY_CNT + 1); d++) {
+                                for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                                    children_subjectRoomCnt[pidx][s][d][p] = temp1_subjectRoomCnt[s][d][p];
+                                }
+                            }
+                        }
+                        for (int c = 0; c < (CLASS_CNT + 1); c++) {
+                            for (int d = 0; d < (DAY_CNT + 1); d++) {
+                                for (int p = 0; p < (PERIOD_CNT + 1); p++) {
+                                    children_classSubjectTable[pidx][c][d][p] = temp1_classSubjectTable[c][d][p];
+                                    children_classTeacherTable[pidx][c][d][p] = temp1_classTeacherTable[c][d][p];
+                                }
+                            }
+                        }
+
+                    }
+                }
+                // 被選中的班級不用交配
+                else {
+                    System.out.println("\tDon't crossover population " + pidx);
+                    for (int cidx = 1; cidx < (CLASS_CNT + 1); cidx++) {
+                        for (int s = 1; s < (SUBJECT_CNT + 1); s++) {
+                            children_classSubjectCnt[pidx][cidx][s] = classSubjectCnt[parentIndex1][cidx][s];
+                            children_classAssignedTeacher[pidx][cidx][s] = classAssignedTeacher[parentIndex1][cidx][s];
+                        }
+                    }
+                    for (int cidx = 1; cidx < CLASS_CNT + 1; cidx++) {
+                        for (int d = 1; d < (DAY_CNT + 1); d++) {
+                            for (int p = 1; p < (PERIOD_CNT + 1); p++) {
+                                children_classSubjectTable[pidx][cidx][d][p] = classSubjectTable[parentIndex1][cidx][d][p];
+                                children_classTeacherTable[pidx][cidx][d][p] = classTeacherTable[parentIndex1][cidx][d][p];
+                                int sidx = classSubjectTable[parentIndex1][cidx][d][p];
+                                children_subjectRoomCnt[pidx][sidx][d][p]++;
+                                int tidx = classTeacherTable[parentIndex1][cidx][d][p];
+                                children_teacherActualTimetable[pidx][tidx][d][p]++;
+                            }
                         }
                     }
                 }
 
-
+                System.out.println("Running mutation...");
 
                 // TODO: 交配完的子代進行突變
 
+                // 輸出交配&變異後的班級課表
+                // 目前只輸出每個 population 的 class 1 和 被選中要交配的班級
+                // 還有輸出每個 population 的 parentIndex1 的 class 1 和 被選中要交配的班級
+                // 記錄科目的中文名稱 (subjectChineseName.csv)
+                String[] subjectChineseName = new String[SUBJECT_CNT + 1];
+                try (var fr = new FileReader("src/main/resources/subjectChineseName.csv", StandardCharsets.UTF_8);
+                     var reader = new CSVReader(fr)) {
+                    int stringIndex = 0;
+                    String[] nextLine;
+                    while ((nextLine = reader.readNext()) != null) {
+                        for (int i = 1; i < subjectChineseName.length; i++) {
+                            subjectChineseName[i] = nextLine[stringIndex];
+                            stringIndex++;
+                        }
+                    }
+                }
+                System.out.println();
+                System.out.println("░░░░░ Output Generation " + generation + "'s data  (children) ░░░░░");
+                // 跳過 classIdx == 0
+                for (int classIdx = 1; classIdx < CLASS_CNT + 1; classIdx++) {
+                    if (classIdx == selectedClassId) {
+                        System.out.println("Population " + pidx + " / Class " + classIdx + " :");
+                        // 橫著輸出課表
+                        for (int period = 1; period < PERIOD_CNT + 1; period++) {
+                            for (int day = 1; day < DAY_CNT + 1; day++) {
+                                // 科目 : 授課老師
+                                int subjectIndex = children_classSubjectTable[pidx][classIdx][day][period];
+                                String name = subjectChineseName[subjectIndex];
+                                if (name == null) {
+                                    System.out.print("null + ");
+                                    System.out.print(children_classSubjectTable[pidx][classIdx][day][period] + ":");
+                                }
+                                else {
+                                    System.out.print(name + " : ");
+                                }
+                                int tidx = children_classAssignedTeacher[pidx][classIdx][subjectIndex];
+                                System.out.print(tidx + "\t\t\t\t\t\t");
+                                if (day == DAY_CNT) {
+                                    System.out.println();
+                                }
+                            }
+                            if (period == PERIOD_CNT) {
+                                System.out.println();
+                            }
+                        }
+                    }
+                }
+                // 記錄科目的中文名稱 (subjectChineseName.csv)
+                try (var fr = new FileReader("src/main/resources/subjectChineseName.csv", StandardCharsets.UTF_8);
+                     var reader = new CSVReader(fr)) {
+                    int stringIndex = 0;
+                    String[] nextLine;
+                    while ((nextLine = reader.readNext()) != null) {
+                        for (int i = 1; i < subjectChineseName.length; i++) {
+                            subjectChineseName[i] = nextLine[stringIndex];
+                            stringIndex++;
+                        }
+                    }
+                }
+                System.out.println();
+                System.out.println("░░░░░ Output Generation " + generation + "'s data  (parentIndex1) ░░░░░");
+                // 跳過 classIdx == 0
+                for (int classIdx = 1; classIdx < CLASS_CNT + 1; classIdx++) {
+                    if (classIdx == selectedClassId) {
+                        System.out.println("Parent " + parentIndex1 + " / Class " + classIdx + " :");
+                        // 橫著輸出課表
+                        for (int period = 1; period < PERIOD_CNT + 1; period++) {
+                            for (int day = 1; day < DAY_CNT + 1; day++) {
+                                // 科目 : 授課老師
+                                int subjectIndex = classSubjectTable[parentIndex1][classIdx][day][period];
+                                String name = subjectChineseName[subjectIndex];
+                                if (name == null) {
+                                    System.out.print("null + ");
+                                    System.out.print(classSubjectTable[parentIndex1][classIdx][day][period] + ":");
+                                }
+                                else {
+                                    System.out.print(name + " : ");
+                                }
+                                int tidx = classAssignedTeacher[parentIndex1][classIdx][subjectIndex];
+                                System.out.print(tidx + "\t\t\t\t\t\t");
+                                if (day == DAY_CNT) {
+                                    System.out.println();
+                                }
+                            }
+                            if (period == PERIOD_CNT) {
+                                System.out.println();
+                            }
+                        }
+                    }
+                }
                 pidx++;
             }
 
+            System.out.println("Running calculation for fitness...");
+
+            // TODO: 計算子代適應度
+
+            System.out.println("Running replacement...");
+
+            // TODO: 挑選適應度高的成為下一個 generation 的父代
+
+            generation++;
         }
 
         // 記錄最佳的適應值 & 目標值
@@ -975,6 +1559,7 @@ public class TimetableGA {
         long endTime = System.nanoTime();
         // 計算執行程式的 elapsed time (in nanoseconds)
         long timeElapsed = endTime - startTime;
-        System.out.println("Execution time: " + timeElapsed / 1000000 + " milliseconds");
+        System.out.println("Execution time: " + timeElapsed / 1000000 + " milliseconds ("
+                + timeElapsed / 1000000000 / 60 + " mins " + timeElapsed / 1000000000 % 60 + " secs)");
     }
 }
