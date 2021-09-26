@@ -687,6 +687,7 @@ public class TimetableGA {
 
         System.out.println("Running calculation for fitness...");
 
+
         // 計算以軟限制式計算適應度
         double[] objectVal = new double[POPULATION_SIZE + 1];
         double[] fitness = new double[POPULATION_SIZE + 1];
@@ -729,24 +730,131 @@ public class TimetableGA {
             }
         }
 
-        // TODO: 整理老師每周最低上課時數的數據，可用 csv 檔匯入
-        // TODO: SC3: 平衡教師不需要工作的天數 (19)
-        // TODO: SC3: 平衡教師不需要工作的天數 (20)
-        // TODO: SC4: 降低教師每周的實際工作節次數 (22)
-        // TODO: SC4: 降低教師每周的實際工作節次數 (23)
-        // TODO: SC5: 降低教師於上午四節的連續排課數量 - owner: chloe
-        // TODO: SC6: 降低教師下午三節的連續排課數量 - owner: chloe
-        // TODO: SC7: 降低教師午休時間前後的連續排課數量 - owner: chloe
+
+        // 整理老師每周最低上課時數的數據，可用 csv 檔匯入
+        // 記錄老師每周最低上課時數的數據 (minTeachingTime.csv)
+        int O[] = new int[TEACHER_CNT+ 1];
+        try (var fr = new FileReader("src/main/resources/minTeachingTime.csv", StandardCharsets.UTF_8);
+             var reader = new CSVReader(fr)) {
+            int stringIndex = 0;
+            String[] nextLine;
+            while ((nextLine = reader.readNext()) != null) {
+                for (int i = 1; i < O.length; i++) {
+                    O[i] = Integer.parseInt(nextLine[stringIndex]);
+                    stringIndex++;
+                }
+            }
+        }
+        // SC3: 平衡教師不需要工作的天數 (19)
+        double MD[][] = new double[POPULATION_SIZE+1][TEACHER_CNT+1];
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                MD[popIndex][tid] = O[tid] / (PERIOD_CNT+1);
+            }
+        }
+
+        // SC3: 平衡教師不需要工作的天數 (20)
+        double BETA[] = new double[POPULATION_SIZE+1];
+        double extra[][] = new double[POPULATION_SIZE+1][TEACHER_CNT+1];
+        for(int popIndex = 0; popIndex<((POPULATION_SIZE+1));popIndex++){
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                extra[popIndex][tid] = D[popIndex][tid] = MD[popIndex][tid];
+                if(extra[popIndex][tid]>BETA[popIndex]){
+                    BETA[popIndex] = extra[popIndex][tid];
+                }
+
+            }
+        }
+
+        // SC4: 降低教師每周的實際工作節次數 (22)
+        double M[][] = new double[POPULATION_SIZE+1][TEACHER_CNT+1];   //老師t一周實際工作節次數量
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                for( int day = 1; day<(DAY_CNT+1);day++) {
+                    for (int period = 1; period < (PERIOD_CNT + 1); period++) {
+                        M[popIndex][tid] += teacherActualTimetable[popIndex][tid][day][period];
+                    }
+                }
+            }
+        }
+        // SC4: 降低教師每周的實際工作節次數 (23)
+        double teacherExtraPeriods [][] = new double[POPULATION_SIZE+1][TEACHER_CNT+1];
+        double BETA1[] = new double[POPULATION_SIZE+1];
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+
+                teacherExtraPeriods[popIndex][tid] = M[popIndex][tid] - O[tid];
+                if(teacherExtraPeriods[popIndex][tid]>BETA1[popIndex])
+                    BETA1[popIndex] = teacherExtraPeriods[popIndex][tid];
+            }
+        }
+        // SC5: 降低教師於上午四節的連續排課數量 - owner: chloe
+        double U []= new double[POPULATION_SIZE + 1];
+        double teacherCalsPeriods[][][]= new double[POPULATION_SIZE + 1][TEACHER_CNT + 1][DAY_CNT + 1];
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                for (int day = 1; day < (DAY_CNT + 1); day++) {
+
+                    //降低上午四節的連續排課數量
+                    for (int period = 1; period < 5 ; period++) {  //FIXME :5
+                        teacherCalsPeriods[popIndex][tid][day]+= teacherActualTimetable[popIndex][tid][day][period];
+                    }
+
+                    if (teacherCalsPeriods[popIndex][tid][day] > U[popIndex])
+                        U[popIndex] = teacherCalsPeriods[popIndex][tid][day];
+                }
+
+            }
+        }
+        // SC6: 降低教師下午三節的連續排課數量 - owner: chloe
+        double V[] = new double[POPULATION_SIZE+1];
+        double teacherCalsPeriods2[][][] = new double[POPULATION_SIZE + 1][TEACHER_CNT + 1][DAY_CNT + 1];
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                for (int day = 1; day < (DAY_CNT + 1); day++) {
+
+                    //降低下午三節的連續排課數量
+                    for (int period = 5; period <(PERIOD_CNT+1) ; period++) {  //ATTENTION :5
+                        teacherCalsPeriods2[popIndex][tid][day]+= teacherActualTimetable[popIndex][tid][day][period];
+                    }
+
+                    if (teacherCalsPeriods2[popIndex][tid][day] > V[popIndex])
+                        V[popIndex] = teacherCalsPeriods2[popIndex][tid][day];
+                }
+
+            }
+        }
+        // SC7: 降低教師午休時間前後的連續排課數量 - owner: chloe
+        double  W[] = new double[POPULATION_SIZE+1];
+        double teacherCalsPeriods3[][][] = new double[POPULATION_SIZE + 1][TEACHER_CNT + 1][DAY_CNT + 1];
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                for (int day = 1; day < (DAY_CNT + 1); day++) {
+
+                    //降低午休前後的連續排課數量
+                    for (int period = 4; period <5 ; period++) {  //ATTENTION :4,5
+                        teacherCalsPeriods3[popIndex][tid][day]+= teacherActualTimetable[popIndex][tid][day][period];
+                    }
+
+                    if (teacherCalsPeriods3[popIndex][tid][day] > W[popIndex])
+                        W[popIndex] = teacherCalsPeriods3[popIndex][tid][day];
+                }
+
+            }
+        }
 
         // 加總上面的分數
         double totalFitness = 0.0;
-        // 各參數比重先寫死，之後可再優化
-        // TODO: 還需要 alpha3 - alpha7
+
         double alpha1 = 1;
         double alpha2 = 1;
+        double alpha3 = 1;
+        double alpha4 = 1;
+        double alpha5 = 1;
+        double alpha6 = 1;
+        double alpha7 = 1;
         for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
-            // TODO: 等 SC3 - SC4 完成後要修改此處
-            objectVal[popIndex] = alpha1 * fitnessJ[popIndex] + alpha2 * fitnessY[popIndex];
+            objectVal[popIndex] = alpha1 * fitnessJ[popIndex] + alpha2 * fitnessY[popIndex]+alpha3*BETA[popIndex]+alpha4*BETA1[popIndex]+alpha5*U[popIndex]+alpha6*V[popIndex]+alpha7*W[popIndex];
             // 適應值為目標值的倒數
             fitness[popIndex] = 1.0 / objectVal[popIndex];
             totalFitness += fitness[popIndex];
