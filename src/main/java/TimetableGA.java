@@ -21,11 +21,11 @@ public class TimetableGA {
     private static final int DAY_CNT = 5;
     private static final int PERIOD_CNT = 7;
     // parameter for setting GA algorithm
-    private static final int POPULATION_SIZE = 6;
+    private static final int POPULATION_SIZE = 10;
     private static final double MUTATION_RATE = 0.5;
     private static final double CROSSOVER_RATE = 0.5;
-    private static final int ELITISM_COUNT = 1;
-    private static final int MAX_GENERATIONS = 2;
+    private static final int ELITISM_COUNT = 2;
+    private static final int MAX_GENERATIONS = 10;
 
     // IMPORTANT NOTE: 程式陣列長度皆為實際需要長度再加 1
     public static void main(String[] args) throws IOException,
@@ -912,9 +912,9 @@ public class TimetableGA {
                 classAssignedTeacher[popIndexA] = Arrays.copyOf(temp_classAssignedTeacher, temp_classAssignedTeacher.length);
             }
 
-            for (int i = 0; i < fitness.length; i++) {
-                System.out.println("\t\tfitness[" + i + "]: " + fitness[i] + " (ObjVal: " + 1 / fitness[i] + ")");
-            }
+//            for (int i = 0; i < fitness.length; i++) {
+//                System.out.println("\t\tfitness[" + i + "]: " + fitness[i] + " (ObjVal: " + 1 / fitness[i] + ")");
+//            }
 
             int[][][][] children_teacherActualTimetable = new int[POPULATION_SIZE + 1][TEACHER_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
             int[][][] children_classSubjectCnt = new int[POPULATION_SIZE + 1][CLASS_CNT + 1][SUBJECT_CNT + 1];
