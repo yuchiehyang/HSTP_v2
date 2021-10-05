@@ -1472,28 +1472,22 @@ public class TimetableGA {
                 // TODO: 交配完的子代進行突變
                 // Step 1 : 先設定突變率Pm，再隨機產生0 至1 的數值，若此值小於突變率，會進行突變
                 // temp表格
-                int [][] m_classSubjectTable = new int[POPULATION_SIZE+1][(DAY_CNT + 1) * (PERIOD_CNT + 1)]; //0~34
+                int [][] m_classSubjectTable = new int[POPULATION_SIZE+1][(DAY_CNT + 1) * (PERIOD_CNT + 1)]; //48個(0-47)
                 int [][] m_classTeacherTable = new int[POPULATION_SIZE+1][(DAY_CNT + 1) * (PERIOD_CNT + 1)];
 
                 int [][] temp_classSubjectTable = new int[POPULATION_SIZE+1][(DAY_CNT + 1) * (PERIOD_CNT + 1)];
                 int [][] temp_classTeacherTable = new int[POPULATION_SIZE+1][(DAY_CNT + 1) * (PERIOD_CNT + 1)];
                 int selectedMClassId;
 
-                for(int mpop = pidx ; mpop<pidx+2 ; mpop++)//checkbox: +2?
+                for(int mpop = pidx ; mpop < pidx+2 ; mpop++)//checkbox: +2?
                 {
                     if (Math.random() <= MUTATION_RATE) {
                         int out = 0;
                         do {
                             //隨機選取欲變異的班級
                             selectedMClassId = r.nextInt(CLASS_CNT) + 1;
-                            if (selectedMClassId == 20 || selectedMClassId == 21 || selectedMClassId == 22) {
-                                selectedMClassId = r.nextInt(CLASS_CNT) + 1;
 
-                            }
                             System.out.println("0");
-                            System.out.println(m_classSubjectTable.length);
-                            System.out.println( children_classSubjectTable.length);
-
 
                             //把內容寫到新的課表裡面
                             int countM = 0;
@@ -1713,7 +1707,6 @@ public class TimetableGA {
                                                         m_classSubjectTable[mpop][mp2] = temp_classSubjectTable[mpop][mp1];
                                                         m_classTeacherTable[mpop][mp1] = temp_classTeacherTable[mpop][mp2];
                                                         m_classTeacherTable[mpop][mp2] = temp_classTeacherTable[mpop][mp1];
-
 
                                                         children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp1 / 7][mp1 % 7]][mp1 / 7][mp1 % 7]++;
                                                         children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp2 / 7][mp2 % 7]][mp2 / 7][mp2 % 7]++;
