@@ -1487,8 +1487,6 @@ public class TimetableGA {
                             //隨機選取欲變異的班級
                             selectedMClassId = r.nextInt(CLASS_CNT) + 1;
 
-                            System.out.println("0");
-
                             //把內容寫到新的課表裡面
                             int countM = 0;
                             for (int mday = 1; mday < (DAY_CNT + 1); mday++) {
@@ -1500,7 +1498,6 @@ public class TimetableGA {
                                     countM++;
                                 }
                             }
-                            System.out.println("1");
 
 
                             //隨機選取兩個突變點(節)
@@ -1509,17 +1506,13 @@ public class TimetableGA {
                             do {
                                 mp1 = r.nextInt(SUBJECT_CNT) + 1;
                             } while ( mp1 == 9 || mp1 == 10);
-                            System.out.println("3");
 
                             //Step 2-1-1:當突變點為連堂課程會一次交換兩節課(m1 & m1+1)
                             if (m_classSubjectTable[mpop][mp1] == 13 && m_classSubjectTable[mpop][mp1+1] == 13) {
-                                System.out.println("3.");
                                 for (int classIndex1 = 0; classIndex1 < (DAY_CNT * PERIOD_CNT); classIndex1++) {
-                                    System.out.println("3..");
                                     if (children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp1 / 7][mp1 % 7]][classIndex1 / 7][classIndex1 % 7] == 1 &&
                                             children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][(mp1 + 1) / 7][(mp1 + 1) % 7]][(classIndex1 + 1) / 7][(classIndex1 + 1) % 7] == 1) {
                                         mp2 = classIndex1;
-                                        System.out.println("3...");
                                         //HC6,8,12,13,14: mp2 不可以是班、周會或聯課 & mp1!=mp2 & mp2不可以是每天第四節或是最後一節課 & 不用換相同科目的
                                         if (mp2 != 0 && mp2 != 9 && mp2 != 10 && mp1 != mp2 && mp2 / 7 != 3 && mp2 / 7 != 6 && m_classSubjectTable[mpop][mp1] != m_classSubjectTable[mpop][mp2]) {
                                             if (children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp2 / 7][mp2 % 7]][mp1 / 7][mp1 % 7] == 1 &&
@@ -1542,7 +1535,6 @@ public class TimetableGA {
                                                 children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][(mp1+1) / 7][(mp1+1) % 7]][(mp2+1) / 7][(mp2+1) % 7]--;
                                                 children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp2 / 7][mp2 % 7]][mp1 / 7][mp1 % 7]--;
                                                 children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][(mp2+1) / 7][(mp2+1) % 7]][(mp1+1) / 7][(mp1+1) % 7]--;
-                                                System.out.println("3.2");
                                                 break;
                                             }else
                                                 out = 0;
@@ -1555,9 +1547,7 @@ public class TimetableGA {
 
                             //Step 2-1-2:當突變點為連堂課程會一次交換兩節課(m1 & m1-1)
                             if (m_classSubjectTable[mpop][mp1] == 13 && m_classSubjectTable[mpop][mp1-1] == 13) {
-                                System.out.println("4.");
                                 for (int classIndex2 = (DAY_CNT * PERIOD_CNT) - 1; classIndex2 > -1; classIndex2--) {
-                                    System.out.println("4..");
                                     if (children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp1 / 7][mp1 % 7]][classIndex2 / 7][classIndex2 % 7] == 1 &&
                                             children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][(mp1 - 1) / 7][(mp1 - 1) % 7]][(classIndex2 - 1) / 7][(classIndex2 - 1) % 7] == 1) {
                                         mp2 = classIndex2;
@@ -1584,7 +1574,6 @@ public class TimetableGA {
                                                 children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][(mp1 - 1) / 7][(mp1 - 1) % 7]][(mp2 - 1) / 7][(mp2 - 1) % 7]--;
                                                 children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp2 / 7][mp2 % 7]][mp1 / 7][mp1 % 7]--;
                                                 children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][(mp2 - 1) / 7][(mp2 - 1) % 7]][(mp1 - 1) / 7][(mp1 - 1) % 7]--;
-
                                                 break;
                                             }
 
@@ -1597,12 +1586,10 @@ public class TimetableGA {
                             //Step 2-2: 而單堂課程為一次交換一節課
                             if (m_classSubjectTable[mpop][mp1] != 13) {
                                 if(Math.random()*100 %10 <5) {
-                                    System.out.println("5.");
                                     for (int periodIndex = 0; periodIndex < (DAY_CNT * PERIOD_CNT); periodIndex++) {
 
                                         if (children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp1 / 7][mp1 % 7]][periodIndex / 7][periodIndex % 7] == 1) {
                                             mp2 = periodIndex;
-                                            System.out.println("5...");
                                             //HC6,8,12,13,14: mp2 不可以是班、周會或聯課 & mp1!=mp2 & 不用換相同科目的
                                             if (mp2 != 0 && mp2 != 9 && mp2 != 10 && m_classSubjectTable[mpop][mp1] != m_classSubjectTable[mpop][mp2]) {
                                                 if (children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp2 / 7][mp2 % 7]][mp1 / 7][mp1 % 7] == 1) {
@@ -1617,7 +1604,6 @@ public class TimetableGA {
                                                     children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp2 / 7][mp2 % 7]][mp2 / 7][mp2 % 7]++;
                                                     children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp1 / 7][mp1 % 7]][mp2 / 7][mp2 % 7]--;
                                                     children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp2 / 7][mp2 % 7]][mp1 / 7][mp1 % 7]--;
-                                                    System.out.println("5.2");
                                                         break;
                                                     }
                                                 }
@@ -1626,10 +1612,8 @@ public class TimetableGA {
                                     }
                                 }else {
                                 for (int classIndex1 = (DAY_CNT * PERIOD_CNT) - 1; classIndex1 > -1; classIndex1--) {
-                                    System.out.println("5..");
                                     if (children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp1 / 7][mp1 % 7]][classIndex1 / 7][classIndex1 % 7] == 1) {
                                         mp2 = classIndex1;
-                                        System.out.println("5...");
                                         //HC6,8,12,13,14: mp2 不可以是班、周會或聯課 & mp1!=mp2  & 不用換相同科目的
                                         if (mp2 != 0 && mp2 != 9 && mp2 != 10 && mp1 != mp2 && m_classSubjectTable[mpop][mp1] != m_classSubjectTable[mpop][mp2]) {
                                             if (children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp2 / 7][mp2 % 7]][mp1 / 7][mp1 % 7] == 1) {
@@ -1643,7 +1627,6 @@ public class TimetableGA {
                                                 children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp2 / 7][mp2 % 7]][mp2 / 7][mp2 % 7]++;
                                                 children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp1 / 7][mp1 % 7]][mp2 / 7][mp2 % 7]--;
                                                 children_teacherActualTimetable[mpop][children_classTeacherTable[mpop][selectedMClassId][mp2 / 7][mp2 % 7]][mp1 / 7][mp1 % 7]--;
-                                                System.out.println("5.2");
                                                 break;
                                             }
                                         }
@@ -1662,7 +1645,6 @@ public class TimetableGA {
                                 countmm++;
                             }
                         }
-                        System.out.println("7");
                     }
                 }
                 pidx++;
