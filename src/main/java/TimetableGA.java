@@ -25,10 +25,13 @@ public class TimetableGA {
     private static final double MUTATION_RATE = 0.5;
     private static final double CROSSOVER_RATE = 0.5;
     private static final int ELITISM_COUNT = 1;
-    private static final int MAX_GENERATIONS = 2;
+    private static final int MAX_GENERATIONS = 1;
 
     // IMPORTANT NOTE: 程式陣列長度皆為實際需要長度再加 1
     public static void main(String[] args) throws IOException, CsvValidationException {
+
+        // parameter for DEBUG mode
+        boolean DEBUG = false;
 
         System.out.println("Running initialization...");
         // 記錄程式開始執行的時間
@@ -653,54 +656,9 @@ public class TimetableGA {
             }
         }
 
-//        // 輸出班級課表
-//        // 記錄科目的中文名稱 (subjectChineseName.csv)
-//        String[] subjectChineseName = new String[SUBJECT_CNT + 1];
-//        try (var fr = new FileReader("src/main/resources/subjectChineseName.csv", StandardCharsets.UTF_8);
-//             var reader = new CSVReader(fr)) {
-//            int stringIndex = 0;
-//            String[] nextLine;
-//            while ((nextLine = reader.readNext()) != null) {
-//                for (int i = 1; i < subjectChineseName.length; i++) {
-//                    subjectChineseName[i] = nextLine[stringIndex];
-//                    stringIndex++;
-//                }
-//            }
-//        }
-//
-//        for (int popIdx = 0; popIdx < (POPULATION_SIZE + 1); popIdx++) {
-//            System.out.println();
-//            System.out.println("░░░░░ Output Population " + popIdx + "'s data ░░░░░");
-//            // 跳過 classIdx == 0
-//            for (int classIdx = 1; classIdx < CLASS_CNT + 1; classIdx++) {
-//
-//                System.out.println("Population " + popIdx + " / Class " + classIdx + " :");
-//                // 橫著輸出課表
-//                for (int period = 1; period < PERIOD_CNT + 1; period++) {
-//                    for (int day = 1; day < DAY_CNT + 1; day++) {
-//                        // 科目 : 授課老師
-//                        int subjectIndex = classSubjectTable[popIdx][classIdx][day][period];
-//                        String name = subjectChineseName[subjectIndex];
-//                        if (name == null) {
-//                            System.out.print("null + ");
-//                            System.out.print(classSubjectTable[popIdx][classIdx][day][period] + ":");
-//                        }
-//                        else {
-//                            System.out.print(name + " : ");
-//                        }
-//                        System.out.print(classTeacherTable[popIdx][classIdx][day][period] + "\t\t\t\t\t\t");
-//                        if (day == DAY_CNT) {
-//                            System.out.println();
-//                        }
-//                    }
-//                    if (period == PERIOD_CNT) {
-//                        System.out.println();
-//                    }
-//                }
-//            }
-//        }
-
-        System.out.println("Running calculation for fitness...");
+        if (DEBUG) {
+            System.out.println("Running calculation for fitness...");
+        }
 
         // 計算以軟限制式計算適應度
         double[] objectVal = new double[POPULATION_SIZE + 1];
@@ -884,8 +842,9 @@ public class TimetableGA {
             }
         }
         double initial_bestObjVal = 1 / initial_bestFitnessVal;
-        System.out.println("\tInitial Fitness: " + initial_bestFitnessVal + " (ObjVal: " + initial_bestObjVal + ")");
-
+        if (DEBUG) {
+            System.out.println("\tInitial Fitness: " + initial_bestFitnessVal + " (ObjVal: " + initial_bestObjVal + ")");
+        }
         // 開始執行 GA 疊代
         int generation = 0;
         while (generation < MAX_GENERATIONS) {
@@ -927,10 +886,11 @@ public class TimetableGA {
                 classAssignedTeacher[popIndexA] = Arrays.copyOf(temp_classAssignedTeacher, temp_classAssignedTeacher.length);
             }
 
-            for (int i = 0; i < fitness.length; i++) {
-                System.out.println("\t\tfitness[" + i + "]: " + fitness[i] + " (ObjVal: " + 1 / fitness[i] + ")");
+            if (DEBUG) {
+                for (int i = 0; i < fitness.length; i++) {
+                    System.out.println("\t\tfitness[" + i + "]: " + fitness[i] + " (ObjVal: " + 1 / fitness[i] + ")");
+                }
             }
-
 
             int[][][][] children_teacherActualTimetable = new int[POPULATION_SIZE + 1][TEACHER_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
             int[][][] children_classSubjectCnt = new int[POPULATION_SIZE + 1][CLASS_CNT + 1][SUBJECT_CNT + 1];
@@ -952,7 +912,9 @@ public class TimetableGA {
             int pidx = ELITISM_COUNT;
             while (pidx < (POPULATION_SIZE + 1)) {
 
-                System.out.println("Running crossover...");
+                if (DEBUG) {
+                    System.out.println("Running crossover...");
+                }
 
                 // 以輪盤法選擇交配使用的 2 個父代的 population
                 double[] cumulative_sum = new double[POPULATION_SIZE + 1];
@@ -1467,7 +1429,9 @@ public class TimetableGA {
                     }
                 }
 
-                System.out.println("Running mutation...");
+                if (DEBUG) {
+                    System.out.println("Running mutation...");
+                }
 
                 // TODO: 交配完的子代進行突變
                 // Step 1 : 先設定突變率Pm，再隨機產生0 至1 的數值，若此值小於突變率，會進行突變
@@ -1836,13 +1800,15 @@ public class TimetableGA {
                 }
             }
             double children_bestObjVal = 1 / children_bestFitnessVal;
+
             System.out.println("\tGeneration " + generation + " Best Fitness: " + children_bestFitnessVal + " (ObjVal: " + children_bestObjVal + ")");
-            if (generation == (MAX_GENERATIONS - 1)) {
-                for (int i = 0; i < fitness.length; i++) {
-                    System.out.println("\t\tfitness[" + i + "]: " + fitness[i] + " (ObjVal: " + 1 / fitness[i] + ")");
+            if (DEBUG) {
+                if (generation == (MAX_GENERATIONS - 1)) {
+                    for (int i = 0; i < fitness.length; i++) {
+                        System.out.println("\t\tfitness[" + i + "]: " + fitness[i] + " (ObjVal: " + 1 / fitness[i] + ")");
+                    }
                 }
             }
-
 
             generation++;
         }
@@ -1857,7 +1823,7 @@ public class TimetableGA {
             }
         }
         double bestObjVal = 1 / bestFitnessVal;
-        // 印出適應度最佳的課表
+        // 印出適應度最佳的班級課表
         System.out.println();
         System.out.println("Best Fitness Value: " + bestFitnessVal + " (ObjVal: " + bestObjVal + ")");
         System.out.println("░░░░░ Output The Best Population ░░░░░");
@@ -1902,6 +1868,54 @@ public class TimetableGA {
                     }
                 }
 //            }
+        }
+
+        // 印出適應度最佳的教師課表
+        int[][][] teacherSubjecTable = new int[TEACHER_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+        int[][][] teacherClassTable = new int[TEACHER_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
+        // 跳過 classIdx == 0
+        for (int classIdx = 1; classIdx < CLASS_CNT + 1; classIdx++) {
+            for (int day = 1; day < DAY_CNT + 1; day++) {
+                for (int period = 1; period < PERIOD_CNT + 1; period++) {
+                    // 科目 : 授課老師
+                    int subjectIndex = classSubjectTable[bestPopIndex][classIdx][day][period];
+                    int tidx = classAssignedTeacher[bestPopIndex][classIdx][subjectIndex];
+                    teacherSubjecTable[tidx][day][period] = subjectIndex;
+                    teacherClassTable[tidx][day][period] = classIdx;
+                }
+            }
+        }
+        // 跳過 teacherIdx == 0
+        for (int teacherIdx = 1; teacherIdx < TEACHER_CNT + 1; teacherIdx++) {
+            System.out.println("Population " + bestPopIndex + " / Teacher " + teacherIdx + " :");
+            // 橫著輸出課表
+            for (int period = 1; period < PERIOD_CNT + 1; period++) {
+                for (int day = 1; day < DAY_CNT + 1; day++) {
+                    // 科目 : 授課老師
+                    int subjectIndex = teacherSubjecTable[teacherIdx][day][period];
+                    String name = subjectChineseName[subjectIndex];
+                    if (name == null) {
+                        System.out.print("BLANK");
+                    }
+                    else {
+                        System.out.print(name + " : ");
+                    }
+                    int cidx = teacherClassTable[teacherIdx][day][period];
+                    if (cidx == 0) {
+                        // pass
+                    }
+                    else {
+                        System.out.print(cidx);
+                    }
+                    System.out.print("\t\t\t\t\t\t");
+                    if (day == DAY_CNT) {
+                        System.out.println();
+                    }
+                }
+                if (period == PERIOD_CNT) {
+                    System.out.println();
+                }
+            }
         }
 
         // 記錄程式執行完畢的時間
