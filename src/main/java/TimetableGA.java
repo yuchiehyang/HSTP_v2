@@ -1840,8 +1840,11 @@ public class TimetableGA {
                 }
             }
         }
-        // 跳過 classIdx == 0
-        for (int classIdx = 1; classIdx < CLASS_CNT + 1; classIdx++) {
+
+        // DEBUG 模式下才印出 5 * 7 的課表
+        if (DEBUG) {
+            // 跳過 classIdx == 0
+            for (int classIdx = 1; classIdx < CLASS_CNT + 1; classIdx++) {
 //            if (classIdx == 1) {
                 System.out.println("Population " + bestPopIndex + " / Class " + classIdx + " :");
                 // 橫著輸出課表
@@ -1868,6 +1871,37 @@ public class TimetableGA {
                     }
                 }
 //            }
+            }
+        }
+        // 非 DEBUG 模式將課表印成字串
+        else {
+            // 跳過 classIdx == 0
+            for (int classIdx = 1; classIdx < CLASS_CNT + 1; classIdx++) {
+                System.out.println("Population " + bestPopIndex + " / Class " + classIdx + " :");
+                // 橫著輸出課表
+                for (int day = 1; day < DAY_CNT + 1; day++) {
+                    for (int period = 1; period < PERIOD_CNT + 1; period++) {
+                        // 科目 : 授課老師
+                        int subjectIndex = classSubjectTable[bestPopIndex][classIdx][day][period];
+                        String name = subjectChineseName[subjectIndex];
+                        if (name == null) {
+                            System.out.print("null + ");
+                            System.out.print(classSubjectTable[bestPopIndex][classIdx][day][period] + ":");
+                        }
+                        else {
+                            System.out.print(name + ":");
+                        }
+                        int tidx = classAssignedTeacher[bestPopIndex][classIdx][subjectIndex];
+                        System.out.print(tidx);
+                        if (!(day == DAY_CNT && period == PERIOD_CNT)) {
+                            System.out.print(",");
+                        }
+                    }
+                    if (day == DAY_CNT) {
+                        System.out.println();
+                    }
+                }
+            }
         }
 
         // 印出適應度最佳的教師課表
@@ -1885,35 +1919,73 @@ public class TimetableGA {
                 }
             }
         }
-        // 跳過 teacherIdx == 0
-        for (int teacherIdx = 1; teacherIdx < TEACHER_CNT + 1; teacherIdx++) {
-            System.out.println("Population " + bestPopIndex + " / Teacher " + teacherIdx + " :");
-            // 橫著輸出課表
-            for (int period = 1; period < PERIOD_CNT + 1; period++) {
-                for (int day = 1; day < DAY_CNT + 1; day++) {
-                    // 科目 : 授課老師
-                    int subjectIndex = teacherSubjecTable[teacherIdx][day][period];
-                    String name = subjectChineseName[subjectIndex];
-                    if (name == null) {
-                        System.out.print("BLANK");
+
+        // DEBUG 模式下才印出 5 * 7 的課表
+        if (DEBUG) {
+            // 跳過 teacherIdx == 0
+            for (int teacherIdx = 1; teacherIdx < TEACHER_CNT + 1; teacherIdx++) {
+                System.out.println("Population " + bestPopIndex + " / Teacher " + teacherIdx + " :");
+                // 橫著輸出課表
+                for (int period = 1; period < PERIOD_CNT + 1; period++) {
+                    for (int day = 1; day < DAY_CNT + 1; day++) {
+                        // 科目 : 授課老師
+                        int subjectIndex = teacherSubjecTable[teacherIdx][day][period];
+                        String name = subjectChineseName[subjectIndex];
+                        if (name == null) {
+                            System.out.print("BLANK");
+                        }
+                        else {
+                            System.out.print(name + " : ");
+                        }
+                        int cidx = teacherClassTable[teacherIdx][day][period];
+                        if (cidx == 0) {
+                            // pass
+                        }
+                        else {
+                            System.out.print(cidx);
+                        }
+                        System.out.print("\t\t\t\t\t\t");
+                        if (day == DAY_CNT) {
+                            System.out.println();
+                        }
                     }
-                    else {
-                        System.out.print(name + " : ");
-                    }
-                    int cidx = teacherClassTable[teacherIdx][day][period];
-                    if (cidx == 0) {
-                        // pass
-                    }
-                    else {
-                        System.out.print(cidx);
-                    }
-                    System.out.print("\t\t\t\t\t\t");
-                    if (day == DAY_CNT) {
+                    if (period == PERIOD_CNT) {
                         System.out.println();
                     }
                 }
-                if (period == PERIOD_CNT) {
-                    System.out.println();
+            }
+        }
+        // 非 DEBUG 模式將課表印成字串
+        else {
+            // 跳過 teacherIdx == 0
+            for (int teacherIdx = 1; teacherIdx < TEACHER_CNT + 1; teacherIdx++) {
+                System.out.println("Population " + bestPopIndex + " / Teacher " + teacherIdx + " :");
+                // 橫著輸出課表
+                for (int day = 1; day < DAY_CNT + 1; day++) {
+                    for (int period = 1; period < PERIOD_CNT + 1; period++) {
+                        // 科目 : 授課老師
+                        int subjectIndex = teacherSubjecTable[teacherIdx][day][period];
+                        String name = subjectChineseName[subjectIndex];
+                        if (name == null) {
+                            System.out.print("BLANK");
+                        }
+                        else {
+                            System.out.print(name + ":");
+                        }
+                        int cidx = teacherClassTable[teacherIdx][day][period];
+                        if (cidx == 0) {
+                            // pass
+                        }
+                        else {
+                            System.out.print(cidx);
+                        }
+                        if (!(day == DAY_CNT && period == PERIOD_CNT)) {
+                            System.out.print(",");
+                        }
+                    }
+                    if (day == DAY_CNT) {
+                        System.out.println();
+                    }
                 }
             }
         }
