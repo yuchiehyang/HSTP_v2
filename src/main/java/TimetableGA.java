@@ -815,7 +815,7 @@ public class TimetableGA {
             }
         }
 
-        // 20211223: 新增軟限制式 SC8
+        // TODO: 20211223: 新增軟限制式 SC8
         // SC8: 盡量在老師偏好時間排課
         double P[] = new double[POPULATION_SIZE + 1];
         int[] notPreferredCnt = new int[TEACHER_CNT + 1];
@@ -870,10 +870,10 @@ public class TimetableGA {
         double alpha5 = 1;
         double alpha6 = 1;
         double alpha7 = 1;
-        // 20211223: alpha8 比重大，加強老師偏好時間
+        // TODO: 20211223: alpha8 比重大，加強老師偏好時間
         double alpha8 = 10;
         for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
-            // 20211223: 適應度考量老師偏好時間
+            // TODO: 20211223: 適應度考量老師偏好時間
             objectVal[popIndex] = alpha1 * fitnessJ[popIndex] + alpha2 * fitnessY[popIndex]+alpha3*BETA[popIndex]+alpha4*BETA1[popIndex]+alpha5*U[popIndex]+alpha6*V[popIndex]+alpha7*W[popIndex]+alpha8*P[popIndex];
             // 適應值為目標值的倒數
             fitness[popIndex] = 1.0 / objectVal[popIndex];
@@ -1828,7 +1828,7 @@ public class TimetableGA {
                 }
             }
 
-            // 20211223: 新增軟限制式 SC8
+            // TODO: 20211223: 新增軟限制式 SC8
             // SC8: 盡量在老師偏好時間排課
             P = new double[POPULATION_SIZE + 1];
             notPreferredCnt = new int[TEACHER_CNT + 1];
@@ -1877,7 +1877,7 @@ public class TimetableGA {
             totalFitness = 0.0;
 
             for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
-                // 20211223: 適應度考量老師偏好時間
+                // TODO: 20211223: 適應度考量老師偏好時間
                 objectVal[popIndex] = alpha1 * fitnessJ[popIndex] + alpha2 * fitnessY[popIndex]+alpha3*BETA[popIndex]+alpha4*BETA1[popIndex]+alpha5*U[popIndex]+alpha6*V[popIndex]+alpha7*W[popIndex]+alpha8*W[popIndex];
                 // 適應值為目標值的倒數
                 fitness[popIndex] = 1.0 / objectVal[popIndex];
@@ -2084,7 +2084,7 @@ public class TimetableGA {
             }
         }
 
-        // 20211223: 檢查 tid 1 ~ 87 有哪些老師的課表符合偏好時間
+        // TODO: 20211223: 檢查 tid 1 ~ 87 有哪些老師的課表符合偏好時間
         // 方便找有符合偏好時間的教師課表，截課表給 ying
         // 此處若不需要可以註解掉
         for (int tid = 1; tid < 88; tid++) {
