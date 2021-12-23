@@ -101,8 +101,8 @@ public class TimetableGA {
                 stringIndex = 0;
             }
         }
-        //Attention --chloe: 記錄老師偏好的授課的時間，可授課的時間為 1，不可授課的時間為 0
-        int[][] teacherPreferredTimetable = new int[TEACHER_CNT + 1][SUBJECT_CNT + 1];
+        //Attention --chloe: 記錄老師偏好的授課的時間
+        int[][] teacherPreferredTimetable = new int[TEACHER_CNT + 1][DAY_CNT * PERIOD_CNT];
         try (var fr = new FileReader("src/main/resources/teacherPreferTeachingTime.csv", StandardCharsets.UTF_8);
              var reader = new CSVReader(fr)) {
             int teacherIndex = 1;
@@ -110,7 +110,7 @@ public class TimetableGA {
             String[] nextLine;
             while ((nextLine = reader.readNext()) != null) {
                 // index 0 不使用
-                for (int i = 1; i < teacherPreferredTimetable[teacherIndex].length; i++) {
+                for (int i = 0; i < teacherPreferredTimetable[teacherIndex].length; i++) {
                     teacherPreferredTimetable[teacherIndex][i] = Integer.parseInt(nextLine[stringIndex]);
                     stringIndex++;
                 }
@@ -815,6 +815,51 @@ public class TimetableGA {
             }
         }
 
+        // 20211223: 新增軟限制式 SC8
+        // SC8: 盡量在老師偏好時間排課
+        double P[] = new double[POPULATION_SIZE + 1];
+        int[] notPreferredCnt = new int[TEACHER_CNT + 1];
+        for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+            for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                notPreferredCnt[tid] = 0;
+                // 記錄老師偏好的授課的時間，可授課的時間為 1，不可授課的時間為 0
+                int[][] preferredTable = new int[DAY_CNT + 1][PERIOD_CNT + 1];
+                for (int i = 0; i < (DAY_CNT * PERIOD_CNT); i++) {
+                    if (teacherPreferredTimetable[tid][i] == 0) {
+                        break;
+                    }
+                    int d = teacherPreferredTimetable[tid][i] / PERIOD_CNT;
+                    if (teacherPreferredTimetable[tid][i] % PERIOD_CNT != 0) {
+                        d += 1;
+                    }
+                    int p = teacherPreferredTimetable[tid][i] % PERIOD_CNT;
+                    if (teacherPreferredTimetable[tid][i] % PERIOD_CNT == 0) {
+                        p = 7;
+                    }
+                    preferredTable[d][p] = 1;
+                }
+                // 如果排課在非老師偏好時間，懲罰值 P 增加
+                for (int day = 1; day < (DAY_CNT + 1); day++) {
+                    for (int period = 1; period < (PERIOD_CNT + 1); period++) {
+                        if (teacherActualTimetable[popIndex][tid][day][period] == 1) {
+                            if (preferredTable[day][period] != 1) {
+                                notPreferredCnt[tid]++;
+                            }
+                        }
+                    }
+                }
+                if (notPreferredCnt[tid] >= 1) {
+                    // 不管違反幾堂，一個老師懲罰值最多只加 1
+                    P[popIndex] += 1;
+                    // 或違反 n 堂，懲罰值就加 n
+                    // P[popIndex] += notPreferredCnt[tid];
+                }
+//                else {
+//                    System.out.println("Teacher " + tid + "'s timetable is ideal.");
+//                }
+            }
+        }
+
         // 加總上面的分數
         double totalFitness = 0.0;
 
@@ -825,8 +870,11 @@ public class TimetableGA {
         double alpha5 = 1;
         double alpha6 = 1;
         double alpha7 = 1;
+        // 20211223: alpha8 比重大，加強老師偏好時間
+        double alpha8 = 10;
         for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
-            objectVal[popIndex] = alpha1 * fitnessJ[popIndex] + alpha2 * fitnessY[popIndex]+alpha3*BETA[popIndex]+alpha4*BETA1[popIndex]+alpha5*U[popIndex]+alpha6*V[popIndex]+alpha7*W[popIndex];
+            // 20211223: 適應度考量老師偏好時間
+            objectVal[popIndex] = alpha1 * fitnessJ[popIndex] + alpha2 * fitnessY[popIndex]+alpha3*BETA[popIndex]+alpha4*BETA1[popIndex]+alpha5*U[popIndex]+alpha6*V[popIndex]+alpha7*W[popIndex]+alpha8*P[popIndex];
             // 適應值為目標值的倒數
             fitness[popIndex] = 1.0 / objectVal[popIndex];
             totalFitness += fitness[popIndex];
@@ -1780,11 +1828,57 @@ public class TimetableGA {
                 }
             }
 
+            // 20211223: 新增軟限制式 SC8
+            // SC8: 盡量在老師偏好時間排課
+            P = new double[POPULATION_SIZE + 1];
+            notPreferredCnt = new int[TEACHER_CNT + 1];
+            for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
+                for (int tid = 1; tid < (TEACHER_CNT + 1); tid++) {
+                    notPreferredCnt[tid] = 0;
+                    // 記錄老師偏好的授課的時間，可授課的時間為 1，不可授課的時間為 0
+                    int[][] preferredTable = new int[DAY_CNT + 1][PERIOD_CNT + 1];
+                    for (int i = 0; i < (DAY_CNT * PERIOD_CNT); i++) {
+                        if (teacherPreferredTimetable[tid][i] == 0) {
+                            break;
+                        }
+                        int d = teacherPreferredTimetable[tid][i] / PERIOD_CNT;
+                        if (teacherPreferredTimetable[tid][i] % PERIOD_CNT != 0) {
+                            d += 1;
+                        }
+                        int p = teacherPreferredTimetable[tid][i] % PERIOD_CNT;
+                        if (teacherPreferredTimetable[tid][i] % PERIOD_CNT == 0) {
+                            p = 7;
+                        }
+                        preferredTable[d][p] = 1;
+                    }
+                    // 如果排課在非老師偏好時間，懲罰值 P 增加
+                    for (int day = 1; day < (DAY_CNT + 1); day++) {
+                        for (int period = 1; period < (PERIOD_CNT + 1); period++) {
+                            if (teacherActualTimetable[popIndex][tid][day][period] == 1) {
+                                if (preferredTable[day][period] != 1) {
+                                    notPreferredCnt[tid]++;
+                                }
+                            }
+                        }
+                    }
+                    if (notPreferredCnt[tid] >= 1) {
+                        // 不管違反幾堂，一個老師懲罰值最多只加 1
+                        P[popIndex] += 1;
+                        // 或違反 n 堂，懲罰值就加 n
+                        // P[popIndex] += notPreferredCnt[tid];
+                    }
+//                else {
+//                    System.out.println("Teacher " + tid + "'s timetable is ideal.");
+//                }
+                }
+            }
+
             // 加總上面的分數
             totalFitness = 0.0;
 
             for (int popIndex = 0; popIndex < (POPULATION_SIZE + 1); popIndex++) {
-                objectVal[popIndex] = alpha1 * fitnessJ[popIndex] + alpha2 * fitnessY[popIndex]+alpha3*BETA[popIndex]+alpha4*BETA1[popIndex]+alpha5*U[popIndex]+alpha6*V[popIndex]+alpha7*W[popIndex];
+                // 20211223: 適應度考量老師偏好時間
+                objectVal[popIndex] = alpha1 * fitnessJ[popIndex] + alpha2 * fitnessY[popIndex]+alpha3*BETA[popIndex]+alpha4*BETA1[popIndex]+alpha5*U[popIndex]+alpha6*V[popIndex]+alpha7*W[popIndex]+alpha8*W[popIndex];
                 // 適應值為目標值的倒數
                 fitness[popIndex] = 1.0 / objectVal[popIndex];
                 totalFitness += fitness[popIndex];
@@ -1987,6 +2081,45 @@ public class TimetableGA {
                         System.out.println();
                     }
                 }
+            }
+        }
+
+        // 20211223: 檢查 tid 1 ~ 87 有哪些老師的課表符合偏好時間
+        // 方便找有符合偏好時間的教師課表，截課表給 ying
+        // 此處若不需要可以註解掉
+        for (int tid = 1; tid < 88; tid++) {
+            // 記錄老師偏好的授課的時間，可授課的時間為 1，不可授課的時間為 0
+            int[][] preferredTable = new int[DAY_CNT + 1][PERIOD_CNT + 1];
+            for (int i = 0; i < (DAY_CNT * PERIOD_CNT); i++) {
+                if (teacherPreferredTimetable[tid][i] == 0) {
+                    break;
+                }
+                int d = teacherPreferredTimetable[tid][i] / PERIOD_CNT;
+                if (teacherPreferredTimetable[tid][i] % PERIOD_CNT != 0) {
+                    d += 1;
+                }
+                int p = teacherPreferredTimetable[tid][i] % PERIOD_CNT;
+                if (teacherPreferredTimetable[tid][i] % PERIOD_CNT == 0) {
+                    p = 7;
+                }
+                preferredTable[d][p] = 1;
+            }
+            boolean isIdeal = true;
+            for (int day = 1; day < (DAY_CNT + 1); day++) {
+                for (int period = 0; period < (PERIOD_CNT + 1); period++) {
+                    int cidx = teacherClassTable[tid][day][period];
+                    if (cidx == 0) {
+                        // pass
+                    }
+                    else {
+                        if (preferredTable[day][period] != 1) {
+                            isIdeal =false;
+                        }
+                    }
+                }
+            }
+            if (isIdeal) {
+                System.out.println("Teacher " + tid + "'s timetable is ideal.");
             }
         }
 
