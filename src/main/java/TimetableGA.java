@@ -5,10 +5,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
@@ -31,13 +27,8 @@ public class TimetableGA {
     private static final int ELITISM_COUNT = 1;
     private static final int MAX_GENERATIONS = 1;
 
-    //ATTENTION 1107 : connection ouput usages
-    static String jdbcURL = "jdbc:mysql://localhost:3306/hstp?sessionVariables=sql_mode='NO_ENGINE_SUBSTITUTION'&jdbcCompliantTruncation=false";
-    static String username = "root";
-    static String password = "m0920776286";
-
     // IMPORTANT NOTE: 程式陣列長度皆為實際需要長度再加 1
-    public static void main(String[] args) throws IOException, CsvValidationException, SQLException {
+    public static void main(String[] args) throws IOException, CsvValidationException {
 
         // parameter for DEBUG mode
         boolean DEBUG = false;
@@ -1849,15 +1840,6 @@ public class TimetableGA {
                 }
             }
         }
-        //開始連結　MySQL DATABASE
-        int batchSize = 100;
-        Connection connection = null;
-        connection = DriverManager.getConnection(jdbcURL, username, password);
-                 /*begin the transaction
-                    -- we have to disable the auto commit mode to enable two or more statements to be grouped into a transaction)*/
-        connection.setAutoCommit(false);
-        String sql = "INSERT INTO output_classtimetable (idClassOutput,moduleOutput_teacherOutput) VALUES (?,?)";
-        PreparedStatement statement = connection.prepareStatement(sql);
 
         // DEBUG 模式下才印出 5 * 7 的課表
         if (DEBUG) {
@@ -1865,8 +1847,6 @@ public class TimetableGA {
             for (int classIdx = 1; classIdx < CLASS_CNT + 1; classIdx++) {
 //            if (classIdx == 1) {
                 System.out.println("Population " + bestPopIndex + " / Class " + classIdx + " :");
-
-
                 // 橫著輸出課表
                 for (int period = 1; period < PERIOD_CNT + 1; period++) {
                     for (int day = 1; day < DAY_CNT + 1; day++) {
@@ -1882,7 +1862,6 @@ public class TimetableGA {
                         }
                         int tidx = classAssignedTeacher[bestPopIndex][classIdx][subjectIndex];
                         System.out.print(tidx + "\t\t\t\t\t\t");
-
                         if (day == DAY_CNT) {
                             System.out.println();
                         }
@@ -1891,21 +1870,14 @@ public class TimetableGA {
                         System.out.println();
                     }
                 }
-
-
 //            }
             }
-
         }
-
         // 非 DEBUG 模式將課表印成字串
         else {
             // 跳過 classIdx == 0
             for (int classIdx = 1; classIdx < CLASS_CNT + 1; classIdx++) {
                 System.out.println("Population " + bestPopIndex + " / Class " + classIdx + " :");
-                statement.setString(1, String.valueOf(classIdx));
-
-                ArrayList<String> module_teacher = new ArrayList();
                 // 橫著輸出課表
                 for (int day = 1; day < DAY_CNT + 1; day++) {
                     for (int period = 1; period < PERIOD_CNT + 1; period++) {
@@ -1920,8 +1892,6 @@ public class TimetableGA {
                             System.out.print(name + ":");
                         }
                         int tidx = classAssignedTeacher[bestPopIndex][classIdx][subjectIndex];
-                        statement.setString(2, name);
-                        module_teacher.add(name+":"+tidx);
                         System.out.print(tidx);
                         if (!(day == DAY_CNT && period == PERIOD_CNT)) {
                             System.out.print(",");
@@ -1930,32 +1900,10 @@ public class TimetableGA {
                     if (day == DAY_CNT) {
                         System.out.println();
                     }
-
                 }
-                String allData = module_teacher.toString();
-                statement.setString(2,allData);
-                statement.addBatch();
-                // execute the remaining queries
-                statement.executeBatch();
-
-                //commit the transaction
-                connection.commit();
-
-                //        connection.rollback();
-
-                System.out.println("Finished write output_classtimetable in MySQL! ");
             }
-            connection.close();
         }
 
-        int batchSize2 = 50;
-        Connection connection2 = null;
-        connection2 = DriverManager.getConnection(jdbcURL, username, password);
-                 /*begin the transaction
-                    -- we have to disable the auto commit mode to enable two or more statements to be grouped into a transaction)*/
-        connection2.setAutoCommit(false);
-        String sql2 = "INSERT INTO output_teachertimetable (idTeacherOutput,classIDs) VALUES (?,?)";
-        PreparedStatement statement2 = connection2.prepareStatement(sql2);
         // 印出適應度最佳的教師課表
         int[][][] teacherSubjecTable = new int[TEACHER_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
         int[][][] teacherClassTable = new int[TEACHER_CNT + 1][DAY_CNT + 1][PERIOD_CNT + 1];
@@ -1977,7 +1925,6 @@ public class TimetableGA {
             // 跳過 teacherIdx == 0
             for (int teacherIdx = 1; teacherIdx < TEACHER_CNT + 1; teacherIdx++) {
                 System.out.println("Population " + bestPopIndex + " / Teacher " + teacherIdx + " :");
-
                 // 橫著輸出課表
                 for (int period = 1; period < PERIOD_CNT + 1; period++) {
                     for (int day = 1; day < DAY_CNT + 1; day++) {
@@ -1986,7 +1933,6 @@ public class TimetableGA {
                         String name = subjectChineseName[subjectIndex];
                         if (name == null) {
                             System.out.print("BLANK");
-
                         }
                         else {
                             System.out.print(name + " : ");
@@ -1997,7 +1943,6 @@ public class TimetableGA {
                         }
                         else {
                             System.out.print(cidx);
-
                         }
                         System.out.print("\t\t\t\t\t\t");
                         if (day == DAY_CNT) {
@@ -2008,18 +1953,13 @@ public class TimetableGA {
                         System.out.println();
                     }
                 }
-
             }
-            connection2.close();
         }
         // 非 DEBUG 模式將課表印成字串
         else {
-
             // 跳過 teacherIdx == 0
             for (int teacherIdx = 1; teacherIdx < TEACHER_CNT + 1; teacherIdx++) {
                 System.out.println("Population " + bestPopIndex + " / Teacher " + teacherIdx + " :");
-                statement2.setString(1, String.valueOf(teacherIdx));
-                ArrayList<String> classIDs = new ArrayList();
                 // 橫著輸出課表
                 for (int day = 1; day < DAY_CNT + 1; day++) {
                     for (int period = 1; period < PERIOD_CNT + 1; period++) {
@@ -2028,7 +1968,6 @@ public class TimetableGA {
                         String name = subjectChineseName[subjectIndex];
                         if (name == null) {
                             System.out.print("BLANK");
-                            classIDs.add("N");
                         }
                         else {
                             System.out.print(name + ":");
@@ -2039,7 +1978,6 @@ public class TimetableGA {
                         }
                         else {
                             System.out.print(cidx);
-                            classIDs.add(name + " : "+cidx);
                         }
                         if (!(day == DAY_CNT && period == PERIOD_CNT)) {
                             System.out.print(",");
@@ -2049,17 +1987,7 @@ public class TimetableGA {
                         System.out.println();
                     }
                 }
-                String allData2 = classIDs.toString();
-                statement2.setString(2,allData2);
-
-                statement2.addBatch();
-                // execute the remaining queries
-                statement2.executeBatch();
-
-                //commit the transaction
-                connection2.commit();
             }
-            connection2.close();
         }
 
         // 記錄程式執行完畢的時間
